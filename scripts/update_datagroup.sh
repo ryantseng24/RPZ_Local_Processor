@@ -13,7 +13,7 @@ source "${SCRIPT_DIR}/utils.sh"
 # =============================================================================
 
 OUTPUT_DIR="${OUTPUT_DIR:-/var/tmp/rpz_datagroups}"
-PARSED_DATA_DIR="${OUTPUT_DIR}/parsed"
+FINAL_OUTPUT_DIR="${OUTPUT_DIR}/final"
 LOG_FILE="${LOG_FILE:-/var/log/ltm}"
 
 # =============================================================================
@@ -34,10 +34,17 @@ update_single_datagroup() {
         return 1
     fi
 
+    # 檢查檔案是否為空
+    if [[ ! -s "$source_file" ]]; then
+        log_warn "來源檔案為空，跳過更新: $source_file"
+        return 0
+    fi
+
     # 執行 tmsh 更新
     if tmsh modify ltm data-group external "$dg_name" source-path "file:$source_file" 2>&1; then
-        log_info "DataGroup $dg_name 更新成功"
-        echo "$timestamp $(hostname) INFO: updated DataGroup $dg_name (file=$source_file)" >> "$LOG_FILE"
+        local record_count=$(wc -l < "$source_file")
+        log_info "DataGroup $dg_name 更新成功 ($record_count 筆記錄)"
+        echo "$timestamp $(hostname) INFO: updated DataGroup $dg_name ($record_count records, file=$source_file)" >> "$LOG_FILE"
         return 0
     else
         log_error "DataGroup $dg_name 更新失敗"
@@ -51,20 +58,13 @@ update_single_datagroup() {
 # =============================================================================
 
 update_all_datagroups() {
-    local timestamp_compact=$(timestamp_compact)
     local success_count=0
     local fail_count=0
 
-    log_info "=== 開始更新 DataGroups ==="
+    log_info "=== 開始更新 F5 DataGroups ==="
 
-    # 更新 rpz DataGroup (主要的)
-    local rpz_file
-    if [[ -n "${RPZ_PARSED_FILE:-}" && -f "$RPZ_PARSED_FILE" ]]; then
-        rpz_file="$RPZ_PARSED_FILE"
-    else
-        rpz_file=$(ls -t "${PARSED_DATA_DIR}"/rpz_*.txt 2>/dev/null | head -1)
-    fi
-
+    # 更新 rpz DataGroup
+    local rpz_file="${FINAL_RPZ_FILE:-${FINAL_OUTPUT_DIR}/rpz.txt}"
     if [[ -f "$rpz_file" ]]; then
         if update_single_datagroup "rpz" "$rpz_file"; then
             ((success_count++))
@@ -72,42 +72,36 @@ update_all_datagroups() {
             ((fail_count++))
         fi
     else
-        log_warn "找不到 RPZ 解析檔案"
+        log_warn "找不到 RPZ DataGroup 檔案: $rpz_file"
+        ((fail_count++))
     fi
 
-    # 更新 phishtw DataGroup (如果有的話)
-    local phishtw_file
-    if [[ -n "${PHISHTW_PARSED_FILE:-}" && -f "$PHISHTW_PARSED_FILE" ]]; then
-        phishtw_file="$PHISHTW_PARSED_FILE"
-    else
-        phishtw_file=$(ls -t "${PARSED_DATA_DIR}"/phishtw_*.txt 2>/dev/null | head -1)
-    fi
-
+    # 更新 phishtw DataGroup (如果存在)
+    local phishtw_file="${FINAL_PHISHTW_FILE:-${FINAL_OUTPUT_DIR}/phishtw.txt}"
     if [[ -f "$phishtw_file" ]]; then
         if update_single_datagroup "phishtw" "$phishtw_file"; then
             ((success_count++))
         else
             ((fail_count++))
         fi
-    fi
-
-    # 更新 IP DataGroup
-    local ip_file
-    if [[ -n "${IP_PARSED_FILE:-}" && -f "$IP_PARSED_FILE" ]]; then
-        ip_file="$IP_PARSED_FILE"
     else
-        ip_file=$(ls -t "${PARSED_DATA_DIR}"/ip_*.txt 2>/dev/null | head -1)
+        log_debug "PhishTW DataGroup 檔案不存在，跳過"
     fi
 
+    # 更新 rpzip DataGroup (IP 類型)
+    local ip_file="${FINAL_IP_FILE:-${FINAL_OUTPUT_DIR}/rpzip.txt}"
     if [[ -f "$ip_file" ]]; then
         if update_single_datagroup "rpzip" "$ip_file"; then
             ((success_count++))
         else
             ((fail_count++))
         fi
+    else
+        log_debug "IP DataGroup 檔案不存在，跳過"
     fi
 
-    log_info "=== 更新完成: 成功 $success_count, 失敗 $fail_count ==="
+    log_info "=== 更新完成 ==="
+    log_info "成功: $success_count 個, 失敗: $fail_count 個"
 
     return $fail_count
 }

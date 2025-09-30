@@ -3,9 +3,8 @@
 # parse_rpz.sh - 解析 RPZ 記錄
 # =============================================================================
 # 功能:
-# 1. 解析 FQDN 類型 RPZ 記錄 (A record)
-# 2. 解析 IP 類型 RPZ 記錄 (CNAME with rpz-ip)
-# 3. 根據 Landing IP 分類 FQDN 記錄
+# 1. 解析 FQDN 類型 RPZ 記錄 (A record) -> key := value 格式
+# 2. 解析 IP 類型 RPZ 記錄 (CNAME with rpz-ip) -> network 格式
 # =============================================================================
 
 set -euo pipefail
@@ -24,6 +23,10 @@ PARSED_DATA_DIR="${OUTPUT_DIR}/parsed"
 
 # =============================================================================
 # AWK 主解析邏輯 (移植自原始程式碼)
+# =============================================================================
+# 輸出格式:
+# - FQDN: "domain" := "landing_ip",
+# - IP:   network ip/mask,
 # =============================================================================
 
 parse_rpz_records() {
@@ -79,17 +82,17 @@ parse_rpz_records() {
         }
     }
     END {
-        # 輸出 rpztw FQDN
+        # 輸出 rpztw FQDN (key := value 格式)
         for (d in rpz) {
             print "\"" d "\" := \"" rpz[d] "\"," > rpz_file
         }
 
-        # 輸出 phishtw FQDN
+        # 輸出 phishtw FQDN (key := value 格式)
         for (d in phishtw) {
             print "\"" d "\" := \"" phishtw[d] "\"," > phishtw_file
         }
 
-        # 輸出 IP 網段
+        # 輸出 IP 網段 (network 格式)
         for (n in iplist) {
             print "network " n "," > ip_file
         }
@@ -100,48 +103,7 @@ parse_rpz_records() {
     local phishtw_count=$(wc -l < "$phishtw_output" 2>/dev/null || echo "0")
     local ip_count=$(wc -l < "$ip_output" 2>/dev/null || echo "0")
 
-    log_info "解析完成: rpztw=$rpz_count, phishtw=$phishtw_count, ip=$ip_count"
-}
-
-# =============================================================================
-# 根據 Landing IP 分類 FQDN (進階版)
-# =============================================================================
-
-classify_by_landing_ip() {
-    local rpz_file="$1"
-    local mapping_config="${PROJECT_ROOT}/config/datagroup_mapping.conf"
-    local output_dir="$PARSED_DATA_DIR"
-
-    log_info "根據 Landing IP 分類 FQDN"
-
-    [[ -f "$mapping_config" ]] || die "映射配置不存在: $mapping_config"
-    [[ -f "$rpz_file" ]] || die "RPZ 檔案不存在: $rpz_file"
-
-    # 清空或建立分類輸出檔案
-    while IFS='=' read -r landing_ip dg_name; do
-        [[ -z "$landing_ip" ]] && continue
-        [[ "$landing_ip" =~ ^# ]] && continue
-
-        landing_ip=$(echo "$landing_ip" | xargs)
-        dg_name=$(echo "$dg_name" | xargs)
-
-        > "${output_dir}/${dg_name}.fqdn"
-    done < "$mapping_config"
-
-    # 分類 FQDN
-    while IFS='=' read -r landing_ip dg_name; do
-        [[ -z "$landing_ip" ]] && continue
-        [[ "$landing_ip" =~ ^# ]] && continue
-
-        landing_ip=$(echo "$landing_ip" | xargs)
-        dg_name=$(echo "$dg_name" | xargs)
-
-        # 從 rpz_file 中篩選出對應 landing_ip 的 FQDN
-        grep ":= \"${landing_ip}\"" "$rpz_file" > "${output_dir}/${dg_name}.fqdn" || true
-
-        local count=$(wc -l < "${output_dir}/${dg_name}.fqdn" 2>/dev/null || echo "0")
-        log_debug "$dg_name: $count 個 FQDN (Landing IP: $landing_ip)"
-    done < "$mapping_config"
+    log_info "解析完成: rpztw=$rpz_count 筆, phishtw=$phishtw_count 筆, ip=$ip_count 筆"
 }
 
 # =============================================================================
@@ -176,14 +138,11 @@ main() {
     # 執行 AWK 解析
     parse_rpz_records "$dnsxdump_file" "$rpz_output" "$phishtw_output" "$ip_output"
 
-    # 進階分類 (根據 Landing IP)
-    if [[ -f "${PROJECT_ROOT}/config/datagroup_mapping.conf" ]]; then
-        classify_by_landing_ip "$rpz_output"
-    else
-        log_warn "未找到 Landing IP 映射配置，跳過分類"
-    fi
-
     log_info "=== 解析完成 ==="
+    log_info "輸出檔案:"
+    log_info "  - RPZ FQDN: $rpz_output"
+    log_info "  - PhishTW FQDN: $phishtw_output"
+    log_info "  - IP 網段: $ip_output"
 
     # 設定全域變數供後續使用
     export RPZ_PARSED_FILE="$rpz_output"

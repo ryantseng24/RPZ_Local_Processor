@@ -96,7 +96,7 @@ RPZ_Local_Processor/
 ├── install.sh                   # 一鍵安裝腳本
 ├── config/
 │   ├── rpz_zones.conf          # RPZ Zone 清單
-│   └── datagroup_mapping.conf  # Landing IP 映射配置
+│   └── cron_example.txt        # Cron 設定範例
 ├── scripts/
 │   ├── main.sh                 # 主執行腳本
 │   ├── extract_rpz.sh          # 從 DNS Express 提取 RPZ
@@ -127,15 +127,6 @@ RPZ_Local_Processor/
 # Format: zone_name
 rpztw.
 phishtw.
-malware.rpz.
-```
-
-**config/datagroup_mapping.conf** - Landing IP 映射
-```bash
-# Format: landing_ip=datagroup_name
-34.102.218.71=dg_rpz_gcp
-182.173.0.181=dg_rpz_local
-210.64.24.25=dg_rpz_twnic
 ```
 
 ### 手動執行
@@ -166,12 +157,22 @@ bash scripts/generate_datagroup.sh # 產生 DataGroup 檔案
 
 DataGroup 檔案會產生在：
 ```
-/var/tmp/rpz_datagroups/
-├── dg_rpz_gcp.txt
-├── dg_rpz_local.txt
-├── dg_rpz_twnic.txt
-├── dg_rpzip.txt
-└── dg_rpzip_blacklist.txt
+/var/tmp/rpz_datagroups/final/
+├── rpz.txt          # RPZ FQDN DataGroup (key := value 格式)
+├── phishtw.txt      # PhishTW FQDN DataGroup
+└── rpzip.txt        # IP 網段 DataGroup
+```
+
+**檔案格式範例**：
+```
+# rpz.txt - FQDN DataGroup
+"malicious.com" := "34.102.218.71",
+"phishing.net" := "182.173.0.181",
+"evil.org" := "210.64.24.25",
+
+# rpzip.txt - IP DataGroup
+network 1.2.3.0/24,
+network 4.5.6.7/32,
 ```
 
 ---
