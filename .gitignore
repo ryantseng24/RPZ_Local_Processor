@@ -1,0 +1,33 @@
+# 日誌檔案
+logs/
+*.log
+
+# 臨時檔案
+*.tmp
+*.temp
+.*.swp
+
+# 測試輸出
+test_output/
+tests/output/
+
+# 生成的 DataGroup 檔案 (用於本地測試)
+datagroups_output/
+
+# 備份檔案
+*.bak
+*.backup
+*~
+
+# 編輯器
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+
+# F5 特定
+*.qkview
+*.ucs
