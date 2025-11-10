@@ -7,6 +7,13 @@ logs/
 *.temp
 .*.swp
 
+# 壓縮檔案
+*.tar.gz
+*.zip
+
+# DNS Express 輸出檔案
+dnsxdump*.txt
+
 # 測試輸出
 test_output/
 tests/output/
