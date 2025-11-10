@@ -57,7 +57,7 @@ prepare_final_datagroups() {
     if [[ -f "$rpz_file" ]]; then
         cp "$rpz_file" "${FINAL_OUTPUT_DIR}/rpz.txt"
         log_info "✓ RPZ DataGroup: ${FINAL_OUTPUT_DIR}/rpz.txt ($(wc -l < "$rpz_file") 筆)"
-        ((count++))
+        count=$((count + 1))
     else
         log_warn "找不到 RPZ 解析檔案"
     fi
@@ -65,7 +65,7 @@ prepare_final_datagroups() {
     if [[ -f "$phishtw_file" ]]; then
         cp "$phishtw_file" "${FINAL_OUTPUT_DIR}/phishtw.txt"
         log_info "✓ PhishTW DataGroup: ${FINAL_OUTPUT_DIR}/phishtw.txt ($(wc -l < "$phishtw_file") 筆)"
-        ((count++))
+        count=$((count + 1))
     else
         log_debug "找不到 PhishTW 解析檔案（可能沒有此 Zone）"
     fi
@@ -73,7 +73,7 @@ prepare_final_datagroups() {
     if [[ -f "$ip_file" ]]; then
         cp "$ip_file" "${FINAL_OUTPUT_DIR}/rpzip.txt"
         log_info "✓ IP DataGroup: ${FINAL_OUTPUT_DIR}/rpzip.txt ($(wc -l < "$ip_file") 筆)"
-        ((count++))
+        count=$((count + 1))
     else
         log_debug "找不到 IP 解析檔案（可能沒有 IP 記錄）"
     fi

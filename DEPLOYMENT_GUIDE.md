@@ -37,7 +37,7 @@ tmsh create ltm data-group external rpzip type ip
 # 從本地上傳到 F5 (使用 scp)
 cd /Users/ryan/project/
 tar czf RPZ_Local_Processor.tar.gz RPZ_Local_Processor/
-scp RPZ_Local_Processor.tar.gz root@<F5_IP>:/config/snmp/
+scp RPZ_Local_Processor.tar.gz admin@<F5_IP>:/var/tmp/
 
 # 或使用你的偏好方法上傳
 ```
@@ -46,10 +46,10 @@ scp RPZ_Local_Processor.tar.gz root@<F5_IP>:/config/snmp/
 
 ```bash
 # SSH 登入 F5
-ssh root@<F5_IP>
+ssh admin@<F5_IP>
 
 # 解壓專案
-cd /config/snmp
+cd /var/tmp
 tar xzf RPZ_Local_Processor.tar.gz
 cd RPZ_Local_Processor
 
@@ -102,20 +102,29 @@ ls -lh /var/tmp/rpz_datagroups/
 tail -f /var/log/ltm
 ```
 
-### 步驟 6: 設定 Cron 定期執行
+### 步驟 6: 設定 iCall 定期執行（推薦）
 
 ```bash
-# 編輯 crontab
-crontab -e
+# 建立 iCall script
+tmsh create sys icall script rpz_processor_script definition \{
+    exec bash /var/tmp/RPZ_Local_Processor/scripts/main.sh
+\}
 
-# 貼上以下內容 (每 5 分鐘執行)
-*/5 * * * * sh /config/snmp/RPZ_Local_Processor/scripts/main.sh >> /shared/log/rpz_processor.log 2>&1
+# 建立 iCall handler (每 5 分鐘執行)
+tmsh create sys icall handler periodic rpz_processor_handler \
+    interval 300 \
+    script rpz_processor_script
 
-# 儲存並退出
-:wq
+# 儲存配置
+tmsh save sys config
 
-# 檢查設定
-crontab -l
+# 檢查狀態
+tmsh show sys icall handler periodic rpz_processor_handler
+```
+
+或使用快速設定腳本：
+```bash
+bash /var/tmp/RPZ_Local_Processor/config/icall_setup.sh
 ```
 
 ### 步驟 7: 部署 iRule
@@ -131,7 +140,7 @@ tmsh edit ltm rule rpz_dns_filter
 # 儲存並退出
 
 # 或使用指令直接載入
-tmsh load sys config file /config/snmp/RPZ_Local_Processor/irules/dns_rpz_irule.tcl
+tmsh load sys config file /var/tmp/RPZ_Local_Processor/irules/rpzdg_local_v1.tcl
 
 # 將 iRule 套用到 DNS Virtual Server
 tmsh modify ltm virtual <YOUR_DNS_VS> rules { rpz_dns_filter }
@@ -181,7 +190,7 @@ dig @localhost <malicious_domain> A
 
 ```bash
 # 1. 檢查 SOA Serial
-bash /config/snmp/RPZ_Local_Processor/scripts/check_soa.sh get rpztw.
+bash /var/tmp/RPZ_Local_Processor/scripts/check_soa.sh get rpztw.
 
 # 2. 檢查處理日誌
 tail -50 /var/log/ltm | grep RPZ
@@ -284,8 +293,9 @@ tmsh list ltm rule rpz_dns_filter
 如果 RPZ 更新不頻繁，可以降低 Cron 執行頻率：
 
 ```bash
-# 從每 5 分鐘改為每 30 分鐘
-*/30 * * * * sh /config/snmp/RPZ_Local_Processor/scripts/main.sh >> /shared/log/rpz_processor.log 2>&1
+# 使用 iCall 修改間隔為 30 分鐘 (1800 秒)
+tmsh modify sys icall handler periodic rpz_processor_handler interval 1800
+tmsh save sys config
 ```
 
 ### SOA 檢查機制
@@ -321,7 +331,7 @@ crontab -e
 
 ```bash
 # 手動執行新版本
-bash /config/snmp/RPZ_Local_Processor/scripts/main.sh
+bash /var/tmp/RPZ_Local_Processor/scripts/main.sh
 
 # 比對輸出結果
 diff /var/tmp/output_*.rpz /var/tmp/rpz_datagroups/parsed/rpz_*.txt
@@ -333,10 +343,11 @@ diff /var/tmp/output_*.rpz /var/tmp/rpz_datagroups/parsed/rpz_*.txt
 
 ## 📞 支援資訊
 
-- **專案位置**: `/config/snmp/RPZ_Local_Processor/`
-- **日誌位置**: `/var/log/ltm` 和 `/shared/log/rpz_processor.log`
+- **專案位置**: `/var/tmp/RPZ_Local_Processor/`
+- **日誌位置**: `/var/log/ltm`
 - **輸出位置**: `/var/tmp/rpz_datagroups/`
-- **配置檔案**: `config/rpz_zones.conf`, `config/datagroup_mapping.conf`
+- **配置檔案**: `config/rpz_zones.conf`
+- **執行方式**: iCall (每 5 分鐘)
 
 ---
 

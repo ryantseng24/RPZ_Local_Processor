@@ -63,41 +63,29 @@ update_all_datagroups() {
 
     log_info "=== 開始更新 F5 DataGroups ==="
 
-    # 更新 rpz DataGroup
+    # 更新 rpztw DataGroup
     local rpz_file="${FINAL_RPZ_FILE:-${FINAL_OUTPUT_DIR}/rpz.txt}"
     if [[ -f "$rpz_file" ]]; then
-        if update_single_datagroup "rpz" "$rpz_file"; then
-            ((success_count++))
+        if update_single_datagroup "rpztw" "$rpz_file"; then
+            success_count=$((success_count + 1))
         else
-            ((fail_count++))
+            fail_count=$((fail_count + 1))
         fi
     else
         log_warn "找不到 RPZ DataGroup 檔案: $rpz_file"
-        ((fail_count++))
+        fail_count=$((fail_count + 1))
     fi
 
     # 更新 phishtw DataGroup (如果存在)
     local phishtw_file="${FINAL_PHISHTW_FILE:-${FINAL_OUTPUT_DIR}/phishtw.txt}"
     if [[ -f "$phishtw_file" ]]; then
         if update_single_datagroup "phishtw" "$phishtw_file"; then
-            ((success_count++))
+            success_count=$((success_count + 1))
         else
-            ((fail_count++))
+            fail_count=$((fail_count + 1))
         fi
     else
         log_debug "PhishTW DataGroup 檔案不存在，跳過"
-    fi
-
-    # 更新 rpzip DataGroup (IP 類型)
-    local ip_file="${FINAL_IP_FILE:-${FINAL_OUTPUT_DIR}/rpzip.txt}"
-    if [[ -f "$ip_file" ]]; then
-        if update_single_datagroup "rpzip" "$ip_file"; then
-            ((success_count++))
-        else
-            ((fail_count++))
-        fi
-    else
-        log_debug "IP DataGroup 檔案不存在，跳過"
     fi
 
     log_info "=== 更新完成 ==="

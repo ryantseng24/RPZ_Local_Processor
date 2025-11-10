@@ -45,17 +45,36 @@ parse_rpz_records() {
         if ($3 == "IN") {
 
             # ===== 處理 FQDN 類型 (A 記錄) =====
-            if ($4 == "A" && substr($1,1,1) != "*") {
+            if ($4 == "A") {
 
                 # rpztw zone
                 if ($1 ~ /\.rpztw\.?$/) {
                     sub(/\.rpztw\.$/, "", $1)
-                    rpz[$1] = $5
+
+                    # 檢查是否為萬用字元記錄 (*.domain)
+                    if (substr($1, 1, 2) == "*.") {
+                        # 移除 "*." 前綴，取得 domain
+                        domain = substr($1, 3)
+                        # 只產生萬用字元記錄（加前綴點）
+                        rpz["." domain] = $5
+                    } else {
+                        # 一般精確記錄（不加前綴點）
+                        rpz[$1] = $5
+                    }
                 }
                 # phishtw zone
                 else if ($1 ~ /\.phishtw\.?$/) {
                     sub(/\.phishtw\.$/, "", $1)
-                    phishtw[$1] = $5
+
+                    # 同樣處理萬用字元
+                    if (substr($1, 1, 2) == "*.") {
+                        domain = substr($1, 3)
+                        # 只產生萬用字元記錄
+                        phishtw["." domain] = $5
+                    } else {
+                        # 精確記錄
+                        phishtw[$1] = $5
+                    }
                 }
             }
 
@@ -97,6 +116,9 @@ parse_rpz_records() {
             print "network " n "," > ip_file
         }
     }' "$input_file"
+
+    # 確保所有輸出檔案都存在（即使為空）
+    touch "$rpz_output" "$phishtw_output" "$ip_output"
 
     # 統計結果
     local rpz_count=$(wc -l < "$rpz_output" 2>/dev/null || echo "0")

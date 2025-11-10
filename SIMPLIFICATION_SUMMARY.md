@@ -230,13 +230,13 @@ network 4.5.6.7/32,
 ### 步驟 1: 備份
 
 ```bash
-cp -r /config/snmp/RPZ_Local_Processor /config/snmp/RPZ_Local_Processor.backup
+cp -r /var/tmp/RPZ_Local_Processor /var/tmp/RPZ_Local_Processor.backup
 ```
 
 ### 步驟 2: 更新程式碼
 
 ```bash
-cd /config/snmp/RPZ_Local_Processor
+cd /var/tmp/RPZ_Local_Processor
 # 上傳新版本覆蓋
 ```
 

@@ -1,12 +1,14 @@
-# RPZ Local Processor - Cron 設定範例
+# RPZ Local Processor - Cron 設定範例（已改用 iCall）
 #
-# 此檔案提供在 F5 BIG-IP 上設定定期執行的範例
+# ⚠️  注意：本專案已改用 F5 iCall 定期執行
+# 此檔案僅供參考，建議使用 iCall 取代 cron
+# iCall 設定請參考：docs/SCHEDULE_SETUP.md
 #
 # 注意事項:
 # 1. F5 TMOS 使用標準 Unix cron 格式
 # 2. 路徑需使用絕對路徑
-# 3. 日誌輸出建議導向 /shared/log/ 或 /var/log/
-# 4. 建議將腳本放在 /config/snmp/ (HA 環境會同步)
+# 3. 日誌輸出建議導向 /var/log/
+# 4. 專案位置：/var/tmp/RPZ_Local_Processor/
 
 # ============================================================================
 # 格式說明
@@ -22,34 +24,34 @@
 # └─────────────── 分鐘 (0-59)
 
 # ============================================================================
-# 範例 1: 每分鐘執行 (原始設定)
+# 範例 1: 每分鐘執行 (原始設定，已棄用)
 # ============================================================================
-# * * * * * sh /config/snmp/convert_rpz.sh >> /shared/log/convert.log 2>&1
+# * * * * * sh /var/tmp/convert_rpz.sh >> /var/log/convert.log 2>&1
 
 # ============================================================================
-# 範例 2: 每 5 分鐘執行 (建議)
+# 範例 2: 每 5 分鐘執行（若不使用 iCall）
 # ============================================================================
-*/5 * * * * sh /config/snmp/RPZ_Local_Processor/scripts/main.sh >> /shared/log/rpz_processor.log 2>&1
+# */5 * * * * bash /var/tmp/RPZ_Local_Processor/scripts/main.sh >> /var/log/rpz_processor.log 2>&1
 
 # ============================================================================
 # 範例 3: 每小時執行
 # ============================================================================
-# 0 * * * * sh /config/snmp/RPZ_Local_Processor/scripts/main.sh >> /shared/log/rpz_processor.log 2>&1
+# 0 * * * * bash /var/tmp/RPZ_Local_Processor/scripts/main.sh >> /var/log/rpz_processor.log 2>&1
 
 # ============================================================================
 # 範例 4: 每天凌晨 2 點執行
 # ============================================================================
-# 0 2 * * * sh /config/snmp/RPZ_Local_Processor/scripts/main.sh >> /shared/log/rpz_processor.log 2>&1
+# 0 2 * * * bash /var/tmp/RPZ_Local_Processor/scripts/main.sh >> /var/log/rpz_processor.log 2>&1
 
 # ============================================================================
 # 範例 5: 工作日每小時執行
 # ============================================================================
-# 0 * * * 1-5 sh /config/snmp/RPZ_Local_Processor/scripts/main.sh >> /shared/log/rpz_processor.log 2>&1
+# 0 * * * 1-5 bash /var/tmp/RPZ_Local_Processor/scripts/main.sh >> /var/log/rpz_processor.log 2>&1
 
 # ============================================================================
 # 範例 6: 使用完整路徑和參數
 # ============================================================================
-# */10 * * * * /bin/bash /config/snmp/RPZ_Local_Processor/scripts/main.sh --verbose >> /shared/log/rpz_processor.log 2>&1
+# */10 * * * * /bin/bash /var/tmp/RPZ_Local_Processor/scripts/main.sh --verbose >> /var/log/rpz_processor.log 2>&1
 
 # ============================================================================
 # 安裝步驟 (在 F5 上)
@@ -66,10 +68,13 @@
 #    crontab -l
 #
 # 5. 檢查執行日誌
-#    tail -f /shared/log/rpz_processor.log
+#    tail -f /var/log/rpz_processor.log
 #
 # 6. 測試手動執行
-#    sh /config/snmp/RPZ_Local_Processor/scripts/main.sh
+#    bash /var/tmp/RPZ_Local_Processor/scripts/main.sh
+#
+# 7. 建議改用 iCall
+#    詳見 docs/SCHEDULE_SETUP.md
 
 # ============================================================================
 # 日誌輪轉 (可選)
@@ -79,10 +84,25 @@
 #
 # 建立 /etc/logrotate.d/rpz_processor:
 #
-# /shared/log/rpz_processor.log {
+# /var/log/rpz_processor.log {
 #     daily
 #     rotate 7
 #     compress
 #     missingok
 #     notifempty
 # }
+#
+# ============================================================================
+# 推薦使用 iCall 取代 cron
+# ============================================================================
+#
+# iCall 優點：
+# - F5 原生支援，配置持久化
+# - 可透過 tmsh 管理和監控
+# - 執行狀態可追蹤
+#
+# 快速設定：
+# bash /var/tmp/RPZ_Local_Processor/config/icall_setup.sh
+#
+# 詳細文件：
+# docs/SCHEDULE_SETUP.md
