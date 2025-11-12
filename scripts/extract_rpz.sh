@@ -78,6 +78,8 @@ main() {
 
     # 設定全域變數供後續腳本使用
     export DNSXDUMP_FILE="$full_dump_file"
+
+    return 0
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then

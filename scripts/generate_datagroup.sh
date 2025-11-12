@@ -101,6 +101,8 @@ main() {
 
     log_info "=== DataGroup 檔案產生完成 ==="
     log_info "檔案位置: $FINAL_OUTPUT_DIR"
+
+    return 0
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then

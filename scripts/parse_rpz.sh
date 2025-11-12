@@ -170,6 +170,8 @@ main() {
     export RPZ_PARSED_FILE="$rpz_output"
     export PHISHTW_PARSED_FILE="$phishtw_output"
     export IP_PARSED_FILE="$ip_output"
+
+    return 0
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then

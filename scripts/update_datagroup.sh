@@ -100,6 +100,7 @@ update_all_datagroups() {
 
 main() {
     update_all_datagroups
+    exit 0
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then

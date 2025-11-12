@@ -75,23 +75,23 @@ init() {
 cleanup() {
     if [[ "$CLEANUP_TEMP" != "true" ]]; then
         log_info "跳過清理臨時檔案"
-        return
+        return 0
     fi
 
     log_info "清理臨時檔案..."
 
-    local timestamp_compact=$(timestamp_compact)
-
     # 清理超過 7 天的舊檔案
     find "$OUTPUT_DIR" -type f -mtime +7 -delete 2>/dev/null || true
+    log_info "清理舊檔案完成"
 
     # 清理當前執行產生的中間檔案
     if [[ -n "${DNSXDUMP_FILE:-}" && -f "$DNSXDUMP_FILE" ]]; then
-        log_debug "清理 dnsxdump 檔案: $DNSXDUMP_FILE"
-        rm -f "$DNSXDUMP_FILE"
+        rm -f "$DNSXDUMP_FILE" || true
+        log_info "清理 dnsxdump 檔案完成"
     fi
 
-    log_debug "清理完成"
+    log_info "cleanup 函數完成"
+    return 0
 }
 
 # =============================================================================
@@ -184,6 +184,8 @@ main() {
     log_info "=========================================="
     log_info "總耗時: $(timer_format "$elapsed")"
     echo "$timestamp $(uname -n) INFO: RPZ processing completed in ${elapsed}s" >> "$LOG_FILE"
+
+    exit 0
 }
 
 # =============================================================================
