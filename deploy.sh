@@ -174,16 +174,28 @@ setup_icall() {
     echo
 
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        if execute_remote "bash ${DEPLOY_PATH}/config/icall_setup.sh" \
-             "→ 設定 iCall"; then
-            log_info "✓ iCall 設定完成"
+        # 使用 REST API 版本 (推薦 - 避免 tmsh brace escaping 問題)
+        log_info "使用 REST API 方式設定 iCall..."
+        if execute_remote "F5_HOST=localhost F5_USER=admin F5_PASS='${F5_PASS}' bash ${DEPLOY_PATH}/config/icall_setup_api.sh" \
+             "→ 設定 iCall (REST API)"; then
+            log_info "✓ iCall 設定完成 (REST API)"
         else
-            log_error "iCall 設定失敗"
-            return 1
+            log_warn "REST API 方式失敗，嘗試使用 tmsh 方式..."
+            if execute_remote "bash ${DEPLOY_PATH}/config/icall_setup.sh" \
+                 "→ 設定 iCall (tmsh)"; then
+                log_info "✓ iCall 設定完成 (tmsh)"
+            else
+                log_error "iCall 設定失敗 (兩種方式都失敗)"
+                log_error "請稍後手動在 F5 上執行:"
+                log_error "  bash ${DEPLOY_PATH}/config/icall_setup_api.sh"
+                return 1
+            fi
         fi
     else
         log_info "跳過 iCall 設定"
-        log_info "稍後可執行: bash ${DEPLOY_PATH}/config/icall_setup.sh"
+        log_info "稍後可執行:"
+        log_info "  REST API 版本 (推薦): bash ${DEPLOY_PATH}/config/icall_setup_api.sh"
+        log_info "  tmsh 版本: bash ${DEPLOY_PATH}/config/icall_setup.sh"
     fi
 }
 

@@ -193,10 +193,65 @@ ls -lh /var/tmp/rpz_datagroups/final/
 
 #### 3.3 設定 iCall 自動執行
 
-**方式 A: 手動配置 (推薦 - 更可靠)**
+**✅ 方式 A: REST API 自動化 (強烈推薦)**
+
+使用 REST API 版本避免 tmsh brace escaping 問題，適合自動化部署：
 
 ```bash
-# 步驟 1: 建立 wrapper script (用於除錯)
+# 直接執行 API 版本腳本
+bash /var/tmp/RPZ_Local_Processor/config/icall_setup_api.sh
+
+# 執行完成後驗證
+tmsh list sys icall handler periodic rpz_processor_handler
+tmsh list sys icall script rpz_processor_script
+
+# 檢查執行日誌 (等待 5 分鐘後)
+tail -f /var/tmp/rpz_wrapper.log
+```
+
+**預期輸出**:
+```
+==========================================
+  設定 RPZ 自動更新 (iCall - API 版本)
+==========================================
+[INFO] 步驟 1: 建立 Wrapper Script...
+✓ Wrapper Script 已建立: /var/tmp/rpz_wrapper.sh
+
+[INFO] 步驟 2: 清理舊的 iCall 配置...
+[INFO] 無舊的 handler 需要刪除
+
+[INFO] 步驟 3: 建立 iCall Script (via REST API)...
+✓ iCall Script 已建立
+
+[INFO] 步驟 4: 建立 iCall Periodic Handler (via REST API)...
+✓ iCall Periodic Handler 已建立
+
+[INFO] 步驟 5: 儲存配置...
+✓ 配置已儲存
+
+==========================================
+  設定完成！
+==========================================
+```
+
+**驗證自動執行**:
+```bash
+# 等待 5-10 分鐘後檢查 wrapper log
+tail -20 /var/tmp/rpz_wrapper.log
+
+# 預期看到類似輸出:
+# === Wed Nov 12 22:38:33 CST 2025 - Wrapper Start ===
+# [INFO] 步驟 1/5: 檢查 RPZ Zone SOA Serial
+# [INFO] SOA Serial 未變更，無需更新
+# === Wed Nov 12 22:38:34 CST 2025 - Exit Code: 0 ===
+```
+
+**方式 B: tmsh 手動配置 (備用方案)**
+
+如果 REST API 無法使用，可使用 tmsh 手動配置：
+
+```bash
+# 步驟 1: 建立 wrapper script
 cat > /var/tmp/rpz_wrapper.sh << 'EOF'
 #!/bin/bash
 {
@@ -222,20 +277,16 @@ tmsh create sys icall handler periodic rpz_processor_handler \
 
 # 步驟 4: 儲存配置
 tmsh save sys config
-
-# 步驟 5: 驗證配置
-tmsh list sys icall handler periodic rpz_processor_handler
-tmsh list sys icall script rpz_processor_script
 ```
 
-**方式 B: 使用自動化腳本 (已知限制)**
+**方式 C: tmsh 自動化腳本 (已知限制)**
 
 ```bash
-# 嘗試使用自動化腳本
+# 使用 tmsh 版本的自動化腳本
 bash /var/tmp/RPZ_Local_Processor/config/icall_setup.sh
 
-# ⚠️ 注意: tmsh 遠端執行可能有 brace escaping 問題
-# 如果失敗，請使用方式 A 手動配置
+# ⚠️ 警告: tmsh 遠端執行可能有 brace escaping 問題
+# 如果失敗，請使用方式 A (REST API) 或方式 B (手動 tmsh)
 ```
 
 ---
@@ -377,7 +428,7 @@ tmsh create ltm data-group external phishtw \
 tmsh save sys config
 ```
 
-### 問題 3: iCall 遠端設定失敗
+### 問題 3: iCall 設定失敗 (tmsh 版本)
 
 **症狀**:
 ```
@@ -386,14 +437,20 @@ Syntax Error: "definition" can't parse script: missing close-brace line:0
 
 **原因**: tmsh brace escaping 在遠端 SSH 不可靠
 
-**解決**:
+**解決方案 (推薦)**:
 ```bash
-# 使用方式 A: 手動在 F5 上執行
+# 使用 REST API 版本 (已解決 brace escaping 問題)
 ssh admin@<F5_IP>
-
-# 手動建立 wrapper script 和 iCall
-# (參考 Phase 3: 方式 A)
+bash /var/tmp/RPZ_Local_Processor/config/icall_setup_api.sh
 ```
+
+**解決方案 (備用)**:
+```bash
+# 手動在 F5 上使用 tmsh 配置
+# (參考 Phase 3.3: 方式 B)
+```
+
+**說明**: REST API 版本使用 JSON 格式，完全避免了 tmsh 的 brace escaping 問題，已在 10.8.34.22 驗證成功。
 
 ### 問題 4: dnsxdump 無輸出
 
@@ -495,10 +552,12 @@ cat /var/tmp/rpz_datagroups/.soa_cache/rpztw.soa
 
 ## 📝 已知限制與注意事項
 
-### 限制 1: iCall 遠端設定不可靠
-- **影響**: config/icall_setup.sh 透過 SSH 執行可能失敗
+### 限制 1: iCall tmsh 設定不可靠 (✅ 已解決)
+- **影響**: config/icall_setup.sh (tmsh 版本) 透過 SSH 執行可能失敗
 - **原因**: tmsh brace escaping 在遠端 SSH session 不穩定
-- **解決**: 手動在 F5 上執行 iCall 設定 (參考 Phase 3: 方式 A)
+- **✅ 解決方案**: 使用 REST API 版本 `config/icall_setup_api.sh`
+- **驗證狀態**: 已在 10.8.34.22 完全驗證成功
+- **說明**: REST API 使用 JSON 格式，完全避免了 brace escaping 問題
 
 ### 限制 2: 乾淨環境需手動建立 DataGroup
 - **影響**: 首次部署需額外步驟
@@ -598,6 +657,7 @@ tmsh modify sys icall handler periodic rpz_processor_handler status active
 |------|------|---------|
 | 1.0 | 2025-09-30 | 初始版本 - 手動部署流程 (10.8.34.234) |
 | 2.0 | 2025-11-12 | 自動化部署流程 (deploy.sh) + 乾淨環境驗證 (10.8.34.22) |
+| 2.1 | 2025-11-12 | ✅ 新增 REST API 版本 iCall 設定 - 完全解決 tmsh brace escaping 問題 |
 
 ---
 
