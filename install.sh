@@ -26,7 +26,7 @@ done
 echo ""
 echo "[2/4] 建立輸出目錄..."
 OUTPUT_BASE="/var/tmp/rpz_datagroups"
-mkdir -p "$OUTPUT_BASE"/{raw,parsed,datagroups}
+mkdir -p "$OUTPUT_BASE"/{raw,parsed,final,.soa_cache}
 echo "  ✓ $OUTPUT_BASE"
 
 # 設定腳本權限
@@ -35,19 +35,19 @@ echo "[3/4] 設定執行權限..."
 chmod +x "${SCRIPT_DIR}/scripts"/*.sh
 echo "  ✓ scripts/*.sh"
 
-# 檢查配置檔案
+# 檢查 F5 環境
 echo ""
-echo "[4/4] 檢查配置檔案..."
-if [[ ! -f "${SCRIPT_DIR}/config/rpz_zones.conf" ]]; then
-    echo "  ⚠ 警告: rpz_zones.conf 不存在，請手動配置"
+echo "[4/4] 檢查 F5 環境..."
+if command -v tmsh >/dev/null 2>&1; then
+    echo "  ✓ tmsh 指令可用"
 else
-    echo "  ✓ rpz_zones.conf"
+    echo "  ⚠ 警告: tmsh 指令不存在，可能不在 F5 環境中"
 fi
 
-if [[ ! -f "${SCRIPT_DIR}/config/datagroup_mapping.conf" ]]; then
-    echo "  ⚠ 警告: datagroup_mapping.conf 不存在，請手動配置"
+if command -v /usr/local/bin/dnsxdump >/dev/null 2>&1; then
+    echo "  ✓ dnsxdump 指令可用"
 else
-    echo "  ✓ datagroup_mapping.conf"
+    echo "  ⚠ 警告: dnsxdump 指令不存在，需要啟用 DNS Express"
 fi
 
 echo ""
@@ -56,13 +56,13 @@ echo "  安裝完成！"
 echo "=========================================="
 echo ""
 echo "下一步："
-echo "1. 編輯配置檔案:"
-echo "   - config/rpz_zones.conf"
-echo "   - config/datagroup_mapping.conf"
+echo "1. 測試執行:"
+echo "   bash scripts/main.sh --force --verbose"
 echo ""
-echo "2. 執行處理程序:"
-echo "   bash scripts/main.sh"
+echo "2. 設定 iCall 定期執行:"
+echo "   bash config/icall_setup.sh"
 echo ""
 echo "3. 檢查輸出:"
-echo "   ls -lh $OUTPUT_BASE/datagroups/"
+echo "   ls -lh $OUTPUT_BASE/final/"
+echo "   tail -f /var/log/ltm | grep RPZ"
 echo ""

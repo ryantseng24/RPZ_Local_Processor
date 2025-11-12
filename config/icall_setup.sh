@@ -9,6 +9,7 @@ set -euo pipefail
 
 # 配置參數
 SCRIPT_PATH="/var/tmp/RPZ_Local_Processor/scripts/main.sh"
+WRAPPER_PATH="/var/tmp/rpz_wrapper.sh"
 INTERVAL="${INTERVAL:-300}"  # 預設 5 分鐘 (300 秒)
 
 echo "=========================================="
@@ -16,6 +17,7 @@ echo "  設定 RPZ 自動更新 (iCall)"
 echo "=========================================="
 echo "執行間隔: ${INTERVAL} 秒"
 echo "腳本路徑: ${SCRIPT_PATH}"
+echo "Wrapper: ${WRAPPER_PATH}"
 echo ""
 
 # 檢查腳本是否存在
@@ -24,24 +26,40 @@ if [[ ! -f "$SCRIPT_PATH" ]]; then
     exit 1
 fi
 
-# 建立 iCall script
-echo "步驟 1: 建立 iCall Script..."
+# 步驟 1: 建立 wrapper script (用於除錯)
+echo "步驟 1: 建立 Wrapper Script..."
+cat > "$WRAPPER_PATH" << 'WRAPPER_EOF'
+#!/bin/bash
+{
+    echo "=== $(date) - Wrapper Start ==="
+    bash /var/tmp/RPZ_Local_Processor/scripts/main.sh
+    exit_code=$?
+    echo "=== $(date) - Exit Code: $exit_code ==="
+    exit $exit_code
+} >> /var/tmp/rpz_wrapper.log 2>&1
+WRAPPER_EOF
+
+chmod +x "$WRAPPER_PATH"
+echo "✓ Wrapper Script 已建立: $WRAPPER_PATH"
+
+# 步驟 2: 建立 iCall script
+echo "步驟 2: 建立 iCall Script..."
 tmsh create sys icall script rpz_processor_script definition \{
-    exec bash ${SCRIPT_PATH}
+    exec bash ${WRAPPER_PATH}
 \}
 
 echo "✓ iCall Script 已建立"
 
-# 建立 iCall periodic handler
-echo "步驟 2: 建立 iCall Periodic Handler..."
+# 步驟 3: 建立 iCall periodic handler
+echo "步驟 3: 建立 iCall Periodic Handler..."
 tmsh create sys icall handler periodic rpz_processor_handler \
     interval ${INTERVAL} \
     script rpz_processor_script
 
 echo "✓ iCall Periodic Handler 已建立"
 
-# 儲存配置
-echo "步驟 3: 儲存配置..."
+# 步驟 4: 儲存配置
+echo "步驟 4: 儲存配置..."
 tmsh save sys config
 
 echo "✓ 配置已儲存"
@@ -56,6 +74,7 @@ echo "  tmsh list sys icall script rpz_processor_script"
 echo ""
 echo "執行記錄:"
 echo "  tail -f /var/log/ltm | grep RPZ"
+echo "  tail -f /var/tmp/rpz_wrapper.log"
 echo ""
 echo "停用/啟用:"
 echo "  tmsh modify sys icall handler periodic rpz_processor_handler status inactive"
@@ -64,4 +83,5 @@ echo ""
 echo "移除:"
 echo "  tmsh delete sys icall handler periodic rpz_processor_handler"
 echo "  tmsh delete sys icall script rpz_processor_script"
+echo "  rm -f /var/tmp/rpz_wrapper.sh /var/tmp/rpz_wrapper.log"
 echo ""
