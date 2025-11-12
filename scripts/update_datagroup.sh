@@ -30,7 +30,7 @@ update_single_datagroup() {
     # 檢查檔案是否存在
     if [[ ! -f "$source_file" ]]; then
         log_error "來源檔案不存在: $source_file"
-        echo "$timestamp $(hostname) ERROR: source file not found: $source_file" >> "$LOG_FILE"
+        echo "$timestamp $(uname -n) ERROR: source file not found: $source_file" >> "$LOG_FILE"
         return 1
     fi
 
@@ -44,11 +44,11 @@ update_single_datagroup() {
     if tmsh modify ltm data-group external "$dg_name" source-path "file:$source_file" 2>&1; then
         local record_count=$(wc -l < "$source_file")
         log_info "DataGroup $dg_name 更新成功 ($record_count 筆記錄)"
-        echo "$timestamp $(hostname) INFO: updated DataGroup $dg_name ($record_count records, file=$source_file)" >> "$LOG_FILE"
+        echo "$timestamp $(uname -n) INFO: updated DataGroup $dg_name ($record_count records, file=$source_file)" >> "$LOG_FILE"
         return 0
     else
         log_error "DataGroup $dg_name 更新失敗"
-        echo "$timestamp $(hostname) ERROR: failed to update DataGroup $dg_name" >> "$LOG_FILE"
+        echo "$timestamp $(uname -n) ERROR: failed to update DataGroup $dg_name" >> "$LOG_FILE"
         return 1
     fi
 }

@@ -121,18 +121,18 @@ main() {
         if [[ "$soa_check_output" == "NO_UPDATE" ]]; then
             # SOA 未變更，無需更新（這是正常情況，不是錯誤）
             log_info "SOA Serial 未變更，無需更新"
-            echo "$timestamp $(hostname) INFO: RPZ SOA not changed, skip update" >> "$LOG_FILE"
+            echo "$timestamp $(uname -n) INFO: RPZ SOA not changed, skip update" >> "$LOG_FILE"
             exit 0
         elif [[ "$soa_check_output" != "UPDATE_NEEDED" ]]; then
             # 檢查失敗或輸出異常
             log_error "SOA 檢查失敗或輸出異常（退出碼: $soa_check_exit, 輸出: '$soa_check_output'）"
-            echo "$timestamp $(hostname) ERROR: RPZ SOA check failed" >> "$LOG_FILE"
+            echo "$timestamp $(uname -n) ERROR: RPZ SOA check failed" >> "$LOG_FILE"
             exit 1
         fi
 
         # SOA 已變更，繼續處理
         log_info "SOA Serial 已變更，繼續處理"
-        echo "$timestamp $(hostname) INFO: RPZ SOA changed, start processing" >> "$LOG_FILE"
+        echo "$timestamp $(uname -n) INFO: RPZ SOA changed, start processing" >> "$LOG_FILE"
     fi
 
     # 步驟 2: 從 DNS Express 提取 RPZ 資料
@@ -140,7 +140,7 @@ main() {
     log_info "步驟 2/5: 提取 DNS Express 資料"
     if ! bash "${SCRIPT_DIR}/extract_rpz.sh"; then
         log_error "資料提取失敗"
-        echo "$timestamp $(hostname) ERROR: RPZ extraction failed" >> "$LOG_FILE"
+        echo "$timestamp $(uname -n) ERROR: RPZ extraction failed" >> "$LOG_FILE"
         exit 1
     fi
 
@@ -149,7 +149,7 @@ main() {
     log_info "步驟 3/5: 解析 RPZ 記錄"
     if ! bash "${SCRIPT_DIR}/parse_rpz.sh"; then
         log_error "RPZ 解析失敗"
-        echo "$timestamp $(hostname) ERROR: RPZ parsing failed" >> "$LOG_FILE"
+        echo "$timestamp $(uname -n) ERROR: RPZ parsing failed" >> "$LOG_FILE"
         exit 1
     fi
 
@@ -158,7 +158,7 @@ main() {
     log_info "步驟 4/5: 產生 DataGroup 檔案"
     if ! bash "${SCRIPT_DIR}/generate_datagroup.sh"; then
         log_error "DataGroup 產生失敗"
-        echo "$timestamp $(hostname) ERROR: DataGroup generation failed" >> "$LOG_FILE"
+        echo "$timestamp $(uname -n) ERROR: DataGroup generation failed" >> "$LOG_FILE"
         exit 1
     fi
 
@@ -167,7 +167,7 @@ main() {
     log_info "步驟 5/5: 更新 F5 DataGroups"
     if ! bash "${SCRIPT_DIR}/update_datagroup.sh"; then
         log_error "F5 DataGroup 更新失敗"
-        echo "$timestamp $(hostname) ERROR: F5 update failed" >> "$LOG_FILE"
+        echo "$timestamp $(uname -n) ERROR: F5 update failed" >> "$LOG_FILE"
         exit 1
     fi
 
@@ -183,7 +183,7 @@ main() {
     log_info "  處理完成"
     log_info "=========================================="
     log_info "總耗時: $(timer_format "$elapsed")"
-    echo "$timestamp $(hostname) INFO: RPZ processing completed in ${elapsed}s" >> "$LOG_FILE"
+    echo "$timestamp $(uname -n) INFO: RPZ processing completed in ${elapsed}s" >> "$LOG_FILE"
 }
 
 # =============================================================================
