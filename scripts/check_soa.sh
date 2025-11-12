@@ -99,21 +99,18 @@ check_zone_update_needed() {
     if [[ "$cached_soa" == "0" ]]; then
         log_info "初始化 SOA 快取: $zone_name (Serial: $current_soa)"
         save_soa_cache "$zone_name" "$current_soa"
-        echo "INIT:$current_soa"
         return 0
     fi
 
     # 比對 SOA Serial
     if [[ "$current_soa" -le "$cached_soa" ]]; then
         log_info "Zone $zone_name 無變更 (快取: $cached_soa, 當前: $current_soa)"
-        echo "NO_UPDATE:$current_soa:$cached_soa"
         return 1
     fi
 
     # 有更新
     log_info "Zone $zone_name 有更新 (快取: $cached_soa, 當前: $current_soa)"
     save_soa_cache "$zone_name" "$current_soa"
-    echo "UPDATED:$current_soa:$cached_soa"
     return 0
 }
 
