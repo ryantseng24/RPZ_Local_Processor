@@ -112,11 +112,25 @@ main() {
     if [[ "$FORCE_RUN" == "true" ]]; then
         log_warn "強制執行模式，跳過 SOA 檢查"
     else
-        if ! bash "${SCRIPT_DIR}/check_soa.sh" check-all; then
+        # 執行 SOA 檢查並捕獲輸出
+        # 輸出: UPDATE_NEEDED=需要更新, NO_UPDATE=無需更新
+        local soa_check_output
+        soa_check_output=$(bash "${SCRIPT_DIR}/check_soa.sh" check-all 2>&1 | grep -E '^(UPDATE_NEEDED|NO_UPDATE)$' | tail -1)
+        local soa_check_exit=$?
+
+        if [[ "$soa_check_output" == "NO_UPDATE" ]]; then
+            # SOA 未變更，無需更新（這是正常情況，不是錯誤）
             log_info "SOA Serial 未變更，無需更新"
             echo "$timestamp $(hostname) INFO: RPZ SOA not changed, skip update" >> "$LOG_FILE"
             exit 0
+        elif [[ "$soa_check_output" != "UPDATE_NEEDED" ]]; then
+            # 檢查失敗或輸出異常
+            log_error "SOA 檢查失敗或輸出異常（退出碼: $soa_check_exit, 輸出: '$soa_check_output'）"
+            echo "$timestamp $(hostname) ERROR: RPZ SOA check failed" >> "$LOG_FILE"
+            exit 1
         fi
+
+        # SOA 已變更，繼續處理
         log_info "SOA Serial 已變更，繼續處理"
         echo "$timestamp $(hostname) INFO: RPZ SOA changed, start processing" >> "$LOG_FILE"
     fi

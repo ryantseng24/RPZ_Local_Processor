@@ -291,3 +291,171 @@ exit 1  # 雖然 main.sh 最終 exit 0，但 scriptd 看到了子進程的輸出
 **修正者**: Claude Code with Ryan
 **測試狀態**: ⏳ 待部署驗證
 **預期結果**: ✅ 消除誤報的錯誤 log
+
+---
+
+## 🔄 追加修正記錄 (2025-11-12 17:16-17:55)
+
+### 部署後發現的問題
+
+第一次修正（移除 check_soa.sh 中的 echo 語句）部署後，發現仍有錯誤：
+
+```
+Nov 12 17:20:00 dns.ryantseng.work err scriptd[12914]: 014f0013:3:
+Script (/Common/rpz_processor_script) generated this Tcl error:
+(script did not successfully complete: ([0;32m[INFO][0m ==========================================
+```
+
+### 根本原因分析（深層）
+
+**F5 iCall scriptd 的行為特性**：
+1. 監控所有子進程的退出碼
+2. 當子進程返回非零時，捕獲**所有 stderr 輸出**（不僅僅是 stdout）
+3. 將 stderr 內容視為錯誤訊息，即使主腳本最終 exit 0
+4. ANSI 顏色碼會出現在錯誤訊息中，導致難以閱讀
+
+### 完整解決方案
+
+#### 階段 1: 移除 stdout 輸出 ✅
+- **檔案**: `scripts/check_soa.sh`
+- **修正**: 移除 3 個 debug echo 語句
+- **時間**: 17:16
+- **結果**: 部分有效，但仍有 stderr 錯誤
+
+#### 階段 2: 禁用彩色輸出 ✅
+- **檔案**: `scripts/utils.sh`
+- **修正**: 自動檢測 TTY，非互動環境禁用 ANSI 顏色碼
+- **時間**: 17:26
+- **程式碼**:
+```bash
+if [[ -t 2 ]] && [[ "${NO_COLOR:-}" != "1" ]]; then
+    # 有 TTY 且未禁用顏色
+    readonly COLOR_GREEN='\033[0;32m'
+    # ...
+else
+    # 無 TTY（如 iCall 環境）或明確禁用顏色
+    readonly COLOR_GREEN=''
+    # ...
+fi
+```
+- **結果**: 移除了 ANSI 碼，但仍有 stderr 錯誤
+
+#### 階段 3: 修改退出碼邏輯 ✅
+- **問題**: 即使使用 `set +e`，iCall scriptd 仍會捕獲子進程的非零退出碼
+- **解決方案**:
+  1. **check_soa.sh**: 總是返回 0，使用 stdout 輸出狀態字串
+  2. **main.sh**: 檢查輸出字串而不是退出碼
+
+- **檔案 1**: `scripts/check_soa.sh`
+  ```bash
+  # 修正前：
+  if [[ $update_needed -eq 1 ]]; then
+      log_info "至少有一個 Zone 需要更新"
+      return 0
+  else
+      log_info "所有 Zones 均無變更"
+      return 1  # ❌ 導致 iCall 誤判
+  fi
+
+  # 修正後：
+  if [[ $update_needed -eq 1 ]]; then
+      log_info "至少有一個 Zone 需要更新"
+      echo "UPDATE_NEEDED"
+      return 0  # ✅ 總是成功
+  else
+      log_info "所有 Zones 均無變更"
+      echo "NO_UPDATE"
+      return 0  # ✅ 總是成功
+  fi
+  ```
+
+- **檔案 2**: `scripts/main.sh`
+  ```bash
+  # 修正前：
+  if ! bash "${SCRIPT_DIR}/check_soa.sh" check-all; then
+      log_info "SOA Serial 未變更，無需更新"
+      exit 0
+  fi
+
+  # 修正後：
+  local soa_check_output
+  soa_check_output=$(bash "${SCRIPT_DIR}/check_soa.sh" check-all 2>&1 | \
+                     grep -E '^(UPDATE_NEEDED|NO_UPDATE)$' | tail -1)
+
+  if [[ "$soa_check_output" == "NO_UPDATE" ]]; then
+      log_info "SOA Serial 未變更，無需更新"
+      exit 0
+  elif [[ "$soa_check_output" != "UPDATE_NEEDED" ]]; then
+      log_error "SOA 檢查失敗"
+      exit 1
+  fi
+  ```
+
+- **時間**: 17:32
+- **結果**: 仍有錯誤（可能因為 iCall 還是捕獲了 stderr）
+
+#### 階段 4: 修改 iCall 配置 ✅ (最終方案)
+- **檔案**: F5 iCall script 配置
+- **修正**: 重定向所有輸出到檔案，避免 scriptd 捕獲 stderr
+- **時間**: 17:40-17:45
+- **命令**:
+```bash
+tmsh modify sys icall script rpz_processor_script definition \
+  '{ exec bash /var/tmp/RPZ_Local_Processor/scripts/main.sh >> /var/tmp/icall_debug.log 2>&1 }'
+```
+
+### 驗證結果
+
+**修正前**（17:15-17:40）：
+```
+Nov 12 17:20:00 err scriptd[12914]: Script generated this Tcl error:
+(script did not successfully complete: ([0;32m[INFO][0m ==...
+Nov 12 17:25:00 err scriptd[12914]: ... ([INFO] ==...  (無顏色碼)
+Nov 12 17:30:00 err scriptd[12914]: ... ([INFO] ==...
+```
+
+**修正後**（17:50-17:55）：
+```
+2025-11-12 17:50:00 dns.ryantseng.work INFO: RPZ SOA not changed, skip update
+2025-11-12 17:55:00 dns.ryantseng.work INFO: RPZ SOA not changed, skip update
+```
+
+✅ **沒有任何 scriptd 錯誤訊息！**
+
+### 技術總結
+
+1. **初步修正有效但不足**：移除 stdout 輸出只解決了部分問題
+2. **F5 iCall 的特殊性**：不僅監控 stdout，也監控 stderr，並對子進程退出碼極為敏感
+3. **多層解決方案**：
+   - 應用層：移除 debug 輸出
+   - 函式層：禁用彩色輸出
+   - 邏輯層：修改退出碼機制
+   - 配置層：重定向輸出（最終關鍵）
+
+### 經驗教訓
+
+1. **F5 iCall 最佳實踐**：
+   - 避免子進程返回非零退出碼
+   - 或重定向所有輸出避免 scriptd 捕獲
+   - stderr 輸出在 iCall 環境中需要特別小心
+
+2. **除錯策略**：
+   - 手動執行測試不一定能重現 iCall 環境的問題
+   - 需要理解調度器（scriptd）的行為特性
+   - 多層次逐步排查，不要放棄
+
+3. **生產環境部署**：
+   - 小步快跑，每次修正後驗證
+   - 保留 debug 能力（輸出到檔案而不是 stderr）
+   - 文件記錄完整的故障排除過程
+
+---
+
+**最終修正完成**: 2025-11-12 17:55
+**測試狀態**: ✅ 已驗證（連續 2 次執行無錯誤）
+**實際結果**: ✅ 完全消除誤報的錯誤 log
+**修正檔案**:
+- `scripts/check_soa.sh` (返回值邏輯)
+- `scripts/main.sh` (檢查邏輯)
+- `scripts/utils.sh` (彩色輸出)
+- F5 iCall script 配置 (輸出重定向)

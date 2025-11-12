@@ -140,10 +140,13 @@ check_all_zones() {
 
     if [[ $update_needed -eq 1 ]]; then
         log_info "至少有一個 Zone 需要更新"
+        echo "UPDATE_NEEDED"
         return 0
     else
         log_info "所有 Zones 均無變更"
-        return 1
+        # 輸出狀態字串並返回 0（避免 F5 iCall scriptd 誤判）
+        echo "NO_UPDATE"
+        return 0
     fi
 }
 

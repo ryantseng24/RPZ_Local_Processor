@@ -3,12 +3,22 @@
 # utils.sh - 共用工具函數庫
 # =============================================================================
 
-# 顏色定義
-readonly COLOR_RED='\033[0;31m'
-readonly COLOR_GREEN='\033[0;32m'
-readonly COLOR_YELLOW='\033[1;33m'
-readonly COLOR_BLUE='\033[0;34m'
-readonly COLOR_RESET='\033[0m'
+# 顏色定義（在非互動環境中自動禁用，避免 ANSI 碼導致 iCall 誤報錯誤）
+if [[ -t 2 ]] && [[ "${NO_COLOR:-}" != "1" ]]; then
+    # 有 TTY 且未禁用顏色
+    readonly COLOR_RED='\033[0;31m'
+    readonly COLOR_GREEN='\033[0;32m'
+    readonly COLOR_YELLOW='\033[1;33m'
+    readonly COLOR_BLUE='\033[0;34m'
+    readonly COLOR_RESET='\033[0m'
+else
+    # 無 TTY（如 iCall 環境）或明確禁用顏色
+    readonly COLOR_RED=''
+    readonly COLOR_GREEN=''
+    readonly COLOR_YELLOW=''
+    readonly COLOR_BLUE=''
+    readonly COLOR_RESET=''
+fi
 
 # 日誌等級
 readonly LOG_DEBUG=0
