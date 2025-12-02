@@ -1,0 +1,12 @@
+# RPZ Zone 清單配置
+# 格式: 每行一個 Zone 名稱 (不含結尾的點)
+# 註解以 # 開頭
+# Zone 名稱同時作為 DataGroup 名稱
+
+rpztw
+phishtw
+
+# 新增更多 Zones 請在下方添加
+# 例如:
+# malware
+# spam

@@ -12,8 +12,8 @@ set -euo pipefail
 F5_HOST="${F5_HOST:-localhost}"
 F5_USER="${F5_USER:-admin}"
 F5_PASS="${F5_PASS:-admin}"
-SCRIPT_PATH="/var/tmp/RPZ_Local_Processor/scripts/main.sh"
-WRAPPER_PATH="/var/tmp/rpz_wrapper.sh"
+SCRIPT_PATH="/config/snmp/RPZ_Local_Processor/scripts/main.sh"
+WRAPPER_PATH="/config/snmp/rpz_wrapper.sh"
 INTERVAL="${INTERVAL:-300}"  # 預設 5 分鐘 (300 秒)
 
 # API 端點
@@ -60,11 +60,11 @@ cat > "$WRAPPER_PATH" << 'WRAPPER_EOF'
 #!/bin/bash
 {
     echo "=== $(date) - Wrapper Start ==="
-    bash /var/tmp/RPZ_Local_Processor/scripts/main.sh
+    bash /config/snmp/RPZ_Local_Processor/scripts/main.sh
     exit_code=$?
     echo "=== $(date) - Exit Code: $exit_code ==="
     exit $exit_code
-} >> /var/tmp/rpz_wrapper.log 2>&1
+} >> /config/snmp/rpz_wrapper.log 2>&1
 WRAPPER_EOF
 
 chmod +x "$WRAPPER_PATH"
@@ -189,7 +189,7 @@ echo "  curl -sku ${F5_USER}:PASS ${HANDLER_ENDPOINT}/rpz_processor_handler | py
 echo ""
 echo "執行記錄:"
 echo "  tail -f /var/log/ltm | grep RPZ"
-echo "  tail -f /var/tmp/rpz_wrapper.log"
+echo "  tail -f /config/snmp/rpz_wrapper.log"
 echo ""
 echo "停用/啟用:"
 echo "  # 使用 tmsh"
@@ -205,7 +205,7 @@ echo "移除:"
 echo "  # 使用 tmsh"
 echo "  tmsh delete sys icall handler periodic rpz_processor_handler"
 echo "  tmsh delete sys icall script rpz_processor_script"
-echo "  rm -f /var/tmp/rpz_wrapper.sh /var/tmp/rpz_wrapper.log"
+echo "  rm -f /config/snmp/rpz_wrapper.sh /config/snmp/rpz_wrapper.log"
 echo ""
 echo "  # 使用 REST API"
 echo "  curl -sku ${F5_USER}:PASS -X DELETE ${HANDLER_ENDPOINT}/rpz_processor_handler"

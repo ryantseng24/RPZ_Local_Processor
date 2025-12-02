@@ -119,7 +119,7 @@ check_zone_update_needed() {
 # =============================================================================
 
 check_all_zones() {
-    local zone_config="${1:-${PROJECT_ROOT}/config/rpz_zones.conf}"
+    local zone_config="${1:-${PROJECT_ROOT}/config/zonelist.txt}"
     local update_needed=0
 
     log_info "=== 開始批次檢查 Zones ==="

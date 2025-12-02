@@ -1,10 +1,11 @@
 #!/bin/bash
 # =============================================================================
-# parse_rpz.sh - 解析 RPZ 記錄
+# parse_rpz.sh - 解析 RPZ 記錄 (動態 Zone 支援)
 # =============================================================================
 # 功能:
-# 1. 解析 FQDN 類型 RPZ 記錄 (A record) -> key := value 格式
-# 2. 解析 IP 類型 RPZ 記錄 (CNAME with rpz-ip) -> network 格式
+# 1. 從 zonelist.txt 讀取要處理的 zones
+# 2. 解析 FQDN 類型 RPZ 記錄 (A record) -> key := value 格式
+# 3. 解析 IP 類型 RPZ 記錄 (CNAME with rpz-ip) -> network 格式
 # =============================================================================
 
 set -euo pipefail
@@ -17,12 +18,36 @@ source "${SCRIPT_DIR}/utils.sh"
 # =============================================================================
 
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-OUTPUT_DIR="${OUTPUT_DIR:-/var/tmp/rpz_datagroups}"
+OUTPUT_DIR="${OUTPUT_DIR:-/config/snmp/rpz_datagroups}"
 RAW_DATA_DIR="${OUTPUT_DIR}/raw"
 PARSED_DATA_DIR="${OUTPUT_DIR}/parsed"
+ZONELIST_FILE="${ZONELIST_FILE:-${PROJECT_ROOT}/config/zonelist.txt}"
 
 # =============================================================================
-# AWK 主解析邏輯 (移植自原始程式碼)
+# 讀取 Zone 清單
+# =============================================================================
+
+get_zone_list() {
+    if [[ ! -f "$ZONELIST_FILE" ]]; then
+        die "Zone 清單檔案不存在: $ZONELIST_FILE"
+    fi
+
+    # 讀取非註解、非空白行
+    grep -v '^#' "$ZONELIST_FILE" | grep -v '^[[:space:]]*$' | xargs
+}
+
+# =============================================================================
+# 將 zone 名稱轉換為正則表達式安全格式
+# =============================================================================
+
+escape_zone_for_regex() {
+    local zone="$1"
+    # 將 . 轉義為 \.
+    echo "$zone" | sed 's/\./\\./g'
+}
+
+# =============================================================================
+# AWK 動態解析邏輯
 # =============================================================================
 # 輸出格式:
 # - FQDN: "domain" := "landing_ip",
@@ -31,101 +56,142 @@ PARSED_DATA_DIR="${OUTPUT_DIR}/parsed"
 
 parse_rpz_records() {
     local input_file="$1"
-    local rpz_output="$2"
-    local phishtw_output="$3"
-    local ip_output="$4"
+    local output_dir="$2"
+    local timestamp="$3"
+    shift 3
+    local zones=("$@")
 
     log_info "解析 RPZ 記錄: $(basename "$input_file")"
+    log_info "處理 Zones: ${zones[*]}"
 
-    awk -v rpz_file="$rpz_output" \
-        -v phishtw_file="$phishtw_output" \
-        -v ip_file="$ip_output" '
+    # 建立 AWK zones 參數 (用 | 分隔，包含原始名稱和 regex 安全格式)
+    # 格式: zone1|escaped1 zone2|escaped2 ...
+    local zone_list=""
+    for zone in "${zones[@]}"; do
+        local escaped_zone
+        escaped_zone=$(escape_zone_for_regex "$zone")
+        zone_list="${zone_list}${zone}|${escaped_zone} "
+    done
+
+    awk -v zone_list="$zone_list" \
+        -v output_dir="$output_dir" \
+        -v timestamp="$timestamp" '
+    BEGIN {
+        # 解析 zone 清單
+        n = split(zone_list, zone_entries, " ")
+        for (i = 1; i <= n; i++) {
+            if (zone_entries[i] != "") {
+                # 分割 zone|escaped_zone
+                split(zone_entries[i], parts, "|")
+                zone_name = parts[1]
+                zone_escaped = parts[2]
+                zone_names[zone_name] = zone_escaped
+            }
+        }
+    }
     {
         # 僅處理 IN class 記錄
         if ($3 == "IN") {
 
             # ===== 處理 FQDN 類型 (A 記錄) =====
             if ($4 == "A") {
+                # 遍歷所有 zones
+                for (zone in zone_names) {
+                    zone_escaped = zone_names[zone]
+                    zone_pattern = "\\." zone_escaped "\\.$"
 
-                # rpztw zone
-                if ($1 ~ /\.rpztw\.?$/) {
-                    sub(/\.rpztw\.$/, "", $1)
+                    if ($1 ~ zone_pattern) {
+                        # 移除 zone 後綴 (使用 escaped 版本)
+                        sub("\\." zone_escaped "\\.$", "", $1)
 
-                    # 檢查是否為萬用字元記錄 (*.domain)
-                    if (substr($1, 1, 2) == "*.") {
-                        # 移除 "*." 前綴，取得 domain
-                        domain = substr($1, 3)
-                        # 只產生萬用字元記錄（加前綴點）
-                        rpz["." domain] = $5
-                    } else {
-                        # 一般精確記錄（不加前綴點）
-                        rpz[$1] = $5
-                    }
-                }
-                # phishtw zone
-                else if ($1 ~ /\.phishtw\.?$/) {
-                    sub(/\.phishtw\.$/, "", $1)
-
-                    # 同樣處理萬用字元
-                    if (substr($1, 1, 2) == "*.") {
-                        domain = substr($1, 3)
-                        # 只產生萬用字元記錄
-                        phishtw["." domain] = $5
-                    } else {
-                        # 精確記錄
-                        phishtw[$1] = $5
+                        # 構建 key (zone + SUBSEP + domain)
+                        if (substr($1, 1, 2) == "*.") {
+                            # 萬用字元記錄 - 加前綴點
+                            domain = substr($1, 3)
+                            key = zone SUBSEP "." domain
+                        } else {
+                            # 精確記錄
+                            key = zone SUBSEP $1
+                        }
+                        zone_data[key] = $5
+                        break
                     }
                 }
             }
 
             # ===== 處理 IP 類型 (rpz-ip CNAME) =====
-            else if ($4 == "CNAME" && index($1, "rpz-ip.rpztw.") > 0) {
-                # 移除 rpz-ip.rpztw 後綴
-                sub(/\.rpz-ip\.rpztw\.$/, "", $1)
+            else if ($4 == "CNAME") {
+                for (zone in zone_names) {
+                    zone_escaped = zone_names[zone]
+                    ip_pattern = "rpz-ip\\." zone_escaped "\\."
 
-                # 分割為 IP 部分
-                split($1, ip_parts, ".")
+                    if (index($1, "rpz-ip." zone ".") > 0) {
+                        # 移除 rpz-ip.zone 後綴
+                        sub("\\.rpz-ip\\." zone_escaped "\\.$", "", $1)
 
-                # 至少需要 5 個部分 (netmask + 4 個 IP octets)
-                if (length(ip_parts) >= 5) {
-                    # 第一個是 netmask
-                    netmask = ip_parts[1]
+                        # 分割為 IP 部分
+                        split($1, ip_parts, ".")
 
-                    # 反轉 IP (parts 5,4,3,2)
-                    reversed_ip = ip_parts[5] "." ip_parts[4] "." ip_parts[3] "." ip_parts[2]
-
-                    # 儲存為 network/mask
-                    iplist[reversed_ip "/" netmask] = 1
+                        # 至少需要 5 個部分 (netmask + 4 個 IP octets)
+                        if (length(ip_parts) >= 5) {
+                            netmask = ip_parts[1]
+                            reversed_ip = ip_parts[5] "." ip_parts[4] "." ip_parts[3] "." ip_parts[2]
+                            iplist[reversed_ip "/" netmask] = 1
+                        }
+                        break
+                    }
                 }
             }
         }
     }
     END {
-        # 輸出 rpztw FQDN (key := value 格式)
-        for (d in rpz) {
-            print "\"" d "\" := \"" rpz[d] "\"," > rpz_file
-        }
+        # 輸出各 zone 的 FQDN (key := value 格式)
+        for (zone in zone_names) {
+            output_file = output_dir "/" zone "_" timestamp ".txt"
+            count = 0
 
-        # 輸出 phishtw FQDN (key := value 格式)
-        for (d in phishtw) {
-            print "\"" d "\" := \"" phishtw[d] "\"," > phishtw_file
+            # 遍歷所有 zone_data，找出屬於此 zone 的記錄
+            for (key in zone_data) {
+                # 分割 key 為 zone 和 domain
+                split(key, key_parts, SUBSEP)
+                if (key_parts[1] == zone) {
+                    domain = key_parts[2]
+                    ip = zone_data[key]
+                    print "\"" domain "\" := \"" ip "\"," > output_file
+                    count++
+                }
+            }
+
+            if (count > 0) {
+                printf "ZONE_COUNT:%s=%d\n", zone, count > "/dev/stderr"
+            }
         }
 
         # 輸出 IP 網段 (network 格式)
+        ip_output_file = output_dir "/rpzip_" timestamp ".txt"
+        ip_count = 0
         for (n in iplist) {
-            print "network " n "," > ip_file
+            print "network " n "," > ip_output_file
+            ip_count++
         }
-    }' "$input_file"
+        if (ip_count > 0) {
+            printf "ZONE_COUNT:rpzip=%d\n", ip_count > "/dev/stderr"
+        }
+    }' "$input_file" 2>&1 | while read -r line; do
+        if [[ "$line" =~ ^ZONE_COUNT:(.+)=([0-9]+)$ ]]; then
+            local zname="${BASH_REMATCH[1]}"
+            local zcount="${BASH_REMATCH[2]}"
+            log_info "  - $zname: $zcount 筆"
+        fi
+    done
 
     # 確保所有輸出檔案都存在（即使為空）
-    touch "$rpz_output" "$phishtw_output" "$ip_output"
+    for zone in "${zones[@]}"; do
+        touch "${output_dir}/${zone}_${timestamp}.txt"
+    done
+    touch "${output_dir}/rpzip_${timestamp}.txt"
 
-    # 統計結果
-    local rpz_count=$(wc -l < "$rpz_output" 2>/dev/null || echo "0")
-    local phishtw_count=$(wc -l < "$phishtw_output" 2>/dev/null || echo "0")
-    local ip_count=$(wc -l < "$ip_output" 2>/dev/null || echo "0")
-
-    log_info "解析完成: rpztw=$rpz_count 筆, phishtw=$phishtw_count 筆, ip=$ip_count 筆"
+    log_info "解析完成"
 }
 
 # =============================================================================
@@ -136,6 +202,18 @@ main() {
     local timestamp_compact=$(timestamp_compact)
 
     log_info "=== 開始解析 RPZ 記錄 ==="
+
+    # 讀取 zone 清單
+    local zone_list_str
+    zone_list_str=$(get_zone_list)
+
+    if [[ -z "$zone_list_str" ]]; then
+        die "Zone 清單為空"
+    fi
+
+    # 轉換為陣列
+    read -ra ZONES <<< "$zone_list_str"
+    log_info "載入 ${#ZONES[@]} 個 Zones: ${ZONES[*]}"
 
     # 建立輸出目錄
     ensure_dir "$PARSED_DATA_DIR"
@@ -152,24 +230,15 @@ main() {
 
     log_info "使用 dnsxdump 檔案: $dnsxdump_file"
 
-    # 定義輸出檔案
-    local rpz_output="${PARSED_DATA_DIR}/rpz_${timestamp_compact}.txt"
-    local phishtw_output="${PARSED_DATA_DIR}/phishtw_${timestamp_compact}.txt"
-    local ip_output="${PARSED_DATA_DIR}/ip_${timestamp_compact}.txt"
-
     # 執行 AWK 解析
-    parse_rpz_records "$dnsxdump_file" "$rpz_output" "$phishtw_output" "$ip_output"
+    parse_rpz_records "$dnsxdump_file" "$PARSED_DATA_DIR" "$timestamp_compact" "${ZONES[@]}"
 
     log_info "=== 解析完成 ==="
-    log_info "輸出檔案:"
-    log_info "  - RPZ FQDN: $rpz_output"
-    log_info "  - PhishTW FQDN: $phishtw_output"
-    log_info "  - IP 網段: $ip_output"
+    log_info "輸出目錄: $PARSED_DATA_DIR"
 
     # 設定全域變數供後續使用
-    export RPZ_PARSED_FILE="$rpz_output"
-    export PHISHTW_PARSED_FILE="$phishtw_output"
-    export IP_PARSED_FILE="$ip_output"
+    export PARSED_TIMESTAMP="$timestamp_compact"
+    export PARSED_ZONES="${ZONES[*]}"
 
     return 0
 }

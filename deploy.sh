@@ -13,7 +13,7 @@ F5_HOST="${1:-}"
 F5_USER="admin"
 F5_PASS="${2:-uniforce}"
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DEPLOY_PATH="/var/tmp/RPZ_Local_Processor"
+DEPLOY_PATH="/config/snmp/RPZ_Local_Processor"
 
 # 函數
 log_info() {
@@ -127,8 +127,8 @@ execute_remote() {
 deploy_on_f5() {
     log_info "在 F5 上部署..."
 
-    # 解壓套件
-    execute_remote "cd /var/tmp && tar xzf RPZ_Local_Processor.tar.gz" \
+    # 解壓套件到 /config/snmp
+    execute_remote "cd /config/snmp && tar xzf /var/tmp/RPZ_Local_Processor.tar.gz" \
         "→ 解壓部署套件" || return 1
 
     # 執行安裝腳本
@@ -149,7 +149,7 @@ verify_deployment() {
     fi
 
     # 檢查輸出目錄
-    if ! execute_remote "test -d /var/tmp/rpz_datagroups" \
+    if ! execute_remote "test -d /config/snmp/rpz_datagroups" \
          "→ 檢查輸出目錄"; then
         log_error "驗證失敗: 輸出目錄不存在"
         return 1
@@ -220,10 +220,10 @@ show_summary() {
     echo ""
     echo "  4. 檢查執行日誌:"
     echo "     tail -f /var/log/ltm | grep RPZ"
-    echo "     tail -f /var/tmp/rpz_wrapper.log"
+    echo "     tail -f /config/snmp/rpz_wrapper.log"
     echo ""
     echo "  5. 檢查輸出:"
-    echo "     ls -lh /var/tmp/rpz_datagroups/final/"
+    echo "     ls -lh /config/snmp/rpz_datagroups/final/"
     echo ""
 }
 

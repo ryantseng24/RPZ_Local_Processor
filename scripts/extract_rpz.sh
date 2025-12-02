@@ -13,7 +13,7 @@ source "${SCRIPT_DIR}/utils.sh"
 # =============================================================================
 
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-OUTPUT_DIR="${OUTPUT_DIR:-/var/tmp/rpz_datagroups}"
+OUTPUT_DIR="${OUTPUT_DIR:-/config/snmp/rpz_datagroups}"
 RAW_DATA_DIR="${OUTPUT_DIR}/raw"
 DNSXDUMP_CMD="${DNSXDUMP_CMD:-/usr/local/bin/dnsxdump}"
 LOG_FILE="${LOG_FILE:-/var/log/ltm}"

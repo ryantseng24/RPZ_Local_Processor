@@ -27,7 +27,7 @@ source "${SCRIPT_DIR}/utils.sh"
 
 CONFIG_DIR="${PROJECT_ROOT}/config"
 LOG_DIR="${PROJECT_ROOT}/logs"
-OUTPUT_DIR="${OUTPUT_DIR:-/var/tmp/rpz_datagroups}"
+OUTPUT_DIR="${OUTPUT_DIR:-/config/snmp/rpz_datagroups}"
 LOG_FILE="${LOG_FILE:-/var/log/ltm}"
 
 # 是否清理臨時檔案 (預設: 是)
@@ -209,7 +209,7 @@ show_usage() {
   $0 -f -n -v          # 強制執行 + 保留檔案 + 詳細輸出
 
 環境變數:
-  OUTPUT_DIR           DataGroup 輸出目錄 (預設: /var/tmp/rpz_datagroups)
+  OUTPUT_DIR           DataGroup 輸出目錄 (預設: /config/snmp/rpz_datagroups)
   LOG_FILE             日誌檔案位置 (預設: /var/log/ltm)
   DNSXDUMP_CMD         dnsxdump 指令路徑 (預設: /usr/local/bin/dnsxdump)
   LOG_LEVEL            日誌等級 0-3 (預設: 1=INFO)

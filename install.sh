@@ -25,7 +25,7 @@ done
 # 建立輸出目錄
 echo ""
 echo "[2/4] 建立輸出目錄..."
-OUTPUT_BASE="/var/tmp/rpz_datagroups"
+OUTPUT_BASE="/config/snmp/rpz_datagroups"
 mkdir -p "$OUTPUT_BASE"/{raw,parsed,final,.soa_cache}
 echo "  ✓ $OUTPUT_BASE"
 
