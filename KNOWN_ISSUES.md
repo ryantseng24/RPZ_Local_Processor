@@ -249,10 +249,60 @@ wc -l /var/tmp/rpz_datagroups/final/rpz.txt
 
 ---
 
+### 2. tmsh save 時出現 Deprecated 警告訊息
+
+**發現日期**: 2025-12-02
+**狀態**: ✅ 可安全忽略
+**影響等級**: 無（純資訊性警告）
+
+#### 問題描述
+
+執行 `tmsh save sys config` 時，LTM log 出現以下警告：
+
+```
+warning  tmsh[xxxx]  01420013  [api-status-warning] wom/server-discovery is deprecated
+warning  tmsh[xxxx]  01420013  [api-status-warning] wom/endpoint-discovery is deprecated
+warning  tmsh[xxxx]  01420013  [api-status-warning] wom/deduplication is deprecated
+warning  tmsh[xxxx]  01420013  [api-status-warning] sys/ecm/cloud-provider is deprecated
+warning  tmsh[xxxx]  01420013  [api-status-warning] sys/datastor is deprecated
+```
+
+#### 根本原因
+
+這是 **F5 BIG-IP 系統的標準棄用通知**，與 RPZ 處理流程無關：
+
+| 模組 | 說明 |
+|------|------|
+| `wom/*` | WAN Optimization Module - 已棄用的 WAN 優化功能 |
+| `sys/ecm/cloud-provider` | Enterprise Cloud Manager - 已棄用的雲端整合 |
+| `sys/datastor` | 資料儲存模組 - 已棄用 |
+
+這些警告會在**任何** `tmsh save sys config` 指令執行時出現，不只是 RPZ 更新。
+
+#### 影響分析
+
+- ✅ **RPZ DataGroup 更新不受影響**
+- ✅ **配置儲存正常完成**
+- ⚠️ 這些模組在未來 BIG-IP 版本可能移除
+
+#### 解決方案
+
+**建議**: 保持現狀，忽略這些警告。
+
+如果需要抑制警告（不建議，可能隱藏其他重要錯誤）：
+
+```bash
+# 在 update_datagroup.sh 中
+tmsh save sys config 2>/dev/null
+```
+
+---
+
 ## 📝 更新歷史
 
 | 日期 | 版本 | 說明 | 作者 |
 |------|------|------|------|
+| 2025-12-02 | 1.1 | 新增 tmsh deprecated 警告說明 | Claude Code with Ryan |
 | 2025-11-12 | 1.0 | 初始記錄 Infoblox/F5 筆數差異問題 | Claude Code with Ryan |
 
 ---
