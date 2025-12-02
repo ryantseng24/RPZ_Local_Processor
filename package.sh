@@ -47,9 +47,12 @@ cp config/icall_setup_api.sh "${PACKAGE_DIR}/config/"
 echo "  ✓ config/zonelist.txt"
 echo "  ✓ config/icall_setup_api.sh"
 
-# 複製安裝腳本
+# 複製安裝與清除腳本
 cp install.sh "${PACKAGE_DIR}/"
 echo "  ✓ install.sh"
+
+cp cleanup.sh "${PACKAGE_DIR}/"
+echo "  ✓ cleanup.sh"
 
 # 複製安裝說明
 cp INSTALL_GUIDE.txt "${PACKAGE_DIR}/" 2>/dev/null || true
@@ -59,6 +62,7 @@ echo ""
 echo "[2/4] 設定檔案權限..."
 chmod +x "${PACKAGE_DIR}/scripts"/*.sh
 chmod +x "${PACKAGE_DIR}/install.sh"
+chmod +x "${PACKAGE_DIR}/cleanup.sh"
 chmod +x "${PACKAGE_DIR}/config/icall_setup_api.sh"
 echo "  ✓ 執行權限已設定"
 

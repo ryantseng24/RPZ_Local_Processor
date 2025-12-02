@@ -1,24 +1,57 @@
 #!/bin/bash
 # =============================================================================
-# cleanup.sh - RPZ Local Processor 完整清理腳本
+# cleanup.sh - RPZ Local Processor 清除腳本
 # =============================================================================
-# 用途: 完全清理 F5 設備上的 RPZ Local Processor 相關配置與檔案
-# 用法: bash cleanup.sh
+# 用途: 完整移除 RPZ Local Processor 及相關配置
+# 執行: 上傳到 F5 後執行 bash cleanup.sh
 # =============================================================================
 
-set -euo pipefail
+set -uo pipefail
 
 echo "=========================================="
-echo "  RPZ Local Processor 完整清理"
+echo "  RPZ Local Processor 清除程式"
 echo "=========================================="
 echo ""
-echo "⚠️  警告: 此腳本將刪除所有 RPZ Local Processor 相關配置與資料"
-echo ""
-read -p "確定要繼續嗎? (yes/N): " -r
-echo
 
-if [[ ! $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
-    echo "已取消清理操作"
+# =============================================================================
+# 定義路徑 (新版路徑)
+# =============================================================================
+
+INSTALL_DIR="/config/snmp/RPZ_Local_Processor"
+OUTPUT_DIR="/config/snmp/rpz_datagroups"
+ICALL_HANDLER="rpz_update_handler"
+ICALL_SCRIPT="rpz_update_script"
+
+# 舊版路徑 (相容性清理)
+OLD_INSTALL_DIR="/var/tmp/RPZ_Local_Processor"
+OLD_OUTPUT_DIR="/var/tmp/rpz_datagroups"
+OLD_ICALL_HANDLER="rpz_processor_handler"
+OLD_ICALL_SCRIPT="rpz_processor_script"
+
+# =============================================================================
+# 確認清除
+# =============================================================================
+
+echo "此腳本將移除以下項目:"
+echo ""
+echo "  [iCall 配置]"
+echo "    - Handler: $ICALL_HANDLER"
+echo "    - Script:  $ICALL_SCRIPT"
+echo ""
+echo "  [程式目錄]"
+echo "    - $INSTALL_DIR"
+[[ -d "$OLD_INSTALL_DIR" ]] && echo "    - $OLD_INSTALL_DIR (舊版)"
+echo ""
+echo "  [輸出目錄]"
+echo "    - $OUTPUT_DIR"
+[[ -d "$OLD_OUTPUT_DIR" ]] && echo "    - $OLD_OUTPUT_DIR (舊版)"
+echo ""
+echo "  [DataGroups] (可選)"
+echo ""
+
+read -p "確定要繼續嗎? (yes/N): " confirm
+if [[ "$confirm" != "yes" && "$confirm" != "YES" ]]; then
+    echo "已取消"
     exit 0
 fi
 
@@ -26,217 +59,212 @@ echo ""
 echo "=== 開始清理程序 ==="
 echo ""
 
-# ============================================
-# 步驟 1: 停用並刪除 iCall 配置
-# ============================================
-echo "[1/7] 處理 iCall 配置..."
+# =============================================================================
+# 步驟 1: 移除 iCall 配置
+# =============================================================================
 
-# 1.1 停用 iCall Handler (避免執行中被刪除)
-echo "  → 停用 iCall Handler..."
-tmsh modify sys icall handler periodic rpz_processor_handler status inactive 2>/dev/null || echo "    (Handler 不存在或已停用)"
+echo "[1/5] 移除 iCall 配置..."
 
-# 等待可能正在執行的任務完成
-sleep 2
-
-# 1.2 刪除 iCall Handler
-echo "  → 刪除 iCall Handler..."
-tmsh delete sys icall handler periodic rpz_processor_handler 2>/dev/null && echo "    ✓ Handler 已刪除" || echo "    (Handler 不存在)"
-
-# 1.3 刪除 iCall Script
-echo "  → 刪除 iCall Script..."
-tmsh delete sys icall script rpz_processor_script 2>/dev/null && echo "    ✓ Script 已刪除" || echo "    (Script 不存在)"
-
-# 1.4 儲存配置
-echo "  → 儲存配置..."
-tmsh save sys config 2>/dev/null && echo "    ✓ 配置已儲存" || echo "    (儲存失敗或無需儲存)"
-
-echo ""
-
-# ============================================
-# 步驟 2: 刪除 DataGroups
-# ============================================
-echo "[2/7] 刪除 DataGroups..."
-
-# 2.1 刪除 rpztw External DataGroup
-echo "  → 刪除 rpztw external data-group..."
-tmsh delete ltm data-group external rpztw 2>/dev/null && echo "    ✓ rpztw 已刪除" || echo "    (rpztw 不存在)"
-
-# 2.2 刪除 phishtw External DataGroup
-echo "  → 刪除 phishtw external data-group..."
-tmsh delete ltm data-group external phishtw 2>/dev/null && echo "    ✓ phishtw 已刪除" || echo "    (phishtw 不存在)"
-
-# 2.3 刪除 rpzip External DataGroup (如果有)
-echo "  → 刪除 rpzip external data-group..."
-tmsh delete ltm data-group external rpzip 2>/dev/null && echo "    ✓ rpzip 已刪除" || echo "    (rpzip 不存在)"
-
-# 2.4 刪除 DataGroup Files
-echo "  → 刪除 data-group files..."
-tmsh delete sys file data-group rpztw 2>/dev/null && echo "    ✓ rpztw file 已刪除" || echo "    (rpztw file 不存在)"
-tmsh delete sys file data-group phishtw 2>/dev/null && echo "    ✓ phishtw file 已刪除" || echo "    (phishtw file 不存在)"
-tmsh delete sys file data-group rpzip 2>/dev/null && echo "    ✓ rpzip file 已刪除" || echo "    (rpzip file 不存在)"
-
-# 2.5 儲存配置
-echo "  → 儲存配置..."
-tmsh save sys config 2>/dev/null && echo "    ✓ 配置已儲存" || echo "    (儲存失敗或無需儲存)"
-
-echo ""
-
-# ============================================
-# 步驟 3: 刪除專案目錄
-# ============================================
-echo "[3/7] 刪除專案目錄..."
-
-if [[ -d "/var/tmp/RPZ_Local_Processor" ]]; then
-    echo "  → 刪除 /var/tmp/RPZ_Local_Processor..."
-    rm -rf /var/tmp/RPZ_Local_Processor
-    echo "    ✓ 專案目錄已刪除"
+# 新版 iCall
+if tmsh list sys icall handler periodic "$ICALL_HANDLER" &>/dev/null; then
+    tmsh modify sys icall handler periodic "$ICALL_HANDLER" status inactive 2>/dev/null || true
+    sleep 1
+    tmsh delete sys icall handler periodic "$ICALL_HANDLER" 2>/dev/null && \
+        echo "  ✓ 已移除 Handler: $ICALL_HANDLER" || \
+        echo "  ✗ 移除 Handler 失敗: $ICALL_HANDLER"
 else
-    echo "    (專案目錄不存在)"
+    echo "  - Handler 不存在: $ICALL_HANDLER"
 fi
 
-echo ""
-
-# ============================================
-# 步驟 4: 刪除輸出目錄
-# ============================================
-echo "[4/7] 刪除輸出目錄..."
-
-if [[ -d "/var/tmp/rpz_datagroups" ]]; then
-    echo "  → 刪除 /var/tmp/rpz_datagroups..."
-    # 顯示目錄大小
-    du -sh /var/tmp/rpz_datagroups 2>/dev/null || echo "    (無法計算大小)"
-    rm -rf /var/tmp/rpz_datagroups
-    echo "    ✓ 輸出目錄已刪除"
+if tmsh list sys icall script "$ICALL_SCRIPT" &>/dev/null; then
+    tmsh delete sys icall script "$ICALL_SCRIPT" 2>/dev/null && \
+        echo "  ✓ 已移除 Script: $ICALL_SCRIPT" || \
+        echo "  ✗ 移除 Script 失敗: $ICALL_SCRIPT"
 else
-    echo "    (輸出目錄不存在)"
+    echo "  - Script 不存在: $ICALL_SCRIPT"
 fi
 
-echo ""
-
-# ============================================
-# 步驟 5: 刪除 Wrapper 相關檔案
-# ============================================
-echo "[5/7] 刪除 Wrapper 相關檔案..."
-
-# 5.1 刪除 wrapper script
-if [[ -f "/var/tmp/rpz_wrapper.sh" ]]; then
-    echo "  → 刪除 /var/tmp/rpz_wrapper.sh..."
-    rm -f /var/tmp/rpz_wrapper.sh
-    echo "    ✓ Wrapper script 已刪除"
-else
-    echo "    (Wrapper script 不存在)"
+# 舊版 iCall (相容性)
+if tmsh list sys icall handler periodic "$OLD_ICALL_HANDLER" &>/dev/null; then
+    tmsh modify sys icall handler periodic "$OLD_ICALL_HANDLER" status inactive 2>/dev/null || true
+    sleep 1
+    tmsh delete sys icall handler periodic "$OLD_ICALL_HANDLER" 2>/dev/null && \
+        echo "  ✓ 已移除舊版 Handler: $OLD_ICALL_HANDLER"
 fi
 
-# 5.2 刪除 wrapper log
-if [[ -f "/var/tmp/rpz_wrapper.log" ]]; then
-    echo "  → 刪除 /var/tmp/rpz_wrapper.log..."
-    # 顯示日誌檔案大小
-    ls -lh /var/tmp/rpz_wrapper.log 2>/dev/null || echo "    (無法顯示檔案資訊)"
-    rm -f /var/tmp/rpz_wrapper.log
-    echo "    ✓ Wrapper log 已刪除"
-else
-    echo "    (Wrapper log 不存在)"
+if tmsh list sys icall script "$OLD_ICALL_SCRIPT" &>/dev/null; then
+    tmsh delete sys icall script "$OLD_ICALL_SCRIPT" 2>/dev/null && \
+        echo "  ✓ 已移除舊版 Script: $OLD_ICALL_SCRIPT"
 fi
 
+# =============================================================================
+# 步驟 2: 移除程式目錄
+# =============================================================================
+
+echo ""
+echo "[2/5] 移除程式目錄..."
+
+if [[ -d "$INSTALL_DIR" ]]; then
+    rm -rf "$INSTALL_DIR"
+    echo "  ✓ 已移除: $INSTALL_DIR"
+else
+    echo "  - 目錄不存在: $INSTALL_DIR"
+fi
+
+# 舊版目錄
+if [[ -d "$OLD_INSTALL_DIR" ]]; then
+    rm -rf "$OLD_INSTALL_DIR"
+    echo "  ✓ 已移除舊版: $OLD_INSTALL_DIR"
+fi
+
+# =============================================================================
+# 步驟 3: 移除輸出目錄
+# =============================================================================
+
+echo ""
+echo "[3/5] 移除輸出目錄..."
+
+if [[ -d "$OUTPUT_DIR" ]]; then
+    echo "  → 目錄大小: $(du -sh "$OUTPUT_DIR" 2>/dev/null | cut -f1)"
+    rm -rf "$OUTPUT_DIR"
+    echo "  ✓ 已移除: $OUTPUT_DIR"
+else
+    echo "  - 目錄不存在: $OUTPUT_DIR"
+fi
+
+# 舊版目錄
+if [[ -d "$OLD_OUTPUT_DIR" ]]; then
+    rm -rf "$OLD_OUTPUT_DIR"
+    echo "  ✓ 已移除舊版: $OLD_OUTPUT_DIR"
+fi
+
+# =============================================================================
+# 步驟 4: 清理暫存檔案
+# =============================================================================
+
+echo ""
+echo "[4/5] 清理暫存檔案..."
+
+# Wrapper 檔案
+rm -f /var/tmp/rpz_wrapper.sh /var/tmp/rpz_wrapper.log 2>/dev/null && \
+    echo "  ✓ 已清理 wrapper 檔案" || echo "  - 無 wrapper 檔案"
+
+# 部署套件
+rm -f /var/tmp/RPZ_Local_Processor.tar.gz 2>/dev/null
+rm -f /var/tmp/rpz_local_processor_*.tar.gz 2>/dev/null
+echo "  ✓ 已清理部署套件"
+
+# =============================================================================
+# 步驟 5: 移除 DataGroups (可選)
+# =============================================================================
+
+echo ""
+echo "[5/5] 移除 DataGroups..."
 echo ""
 
-# ============================================
-# 步驟 6: 刪除部署套件
-# ============================================
-echo "[6/7] 刪除部署套件..."
+# 列出所有 external DataGroups
+echo "  偵測到以下 External DataGroups:"
+DATAGROUPS=$(tmsh list ltm data-group external one-line 2>/dev/null | awk '{print $4}' | sort)
 
-if [[ -f "/var/tmp/RPZ_Local_Processor.tar.gz" ]]; then
-    echo "  → 刪除 /var/tmp/RPZ_Local_Processor.tar.gz..."
-    ls -lh /var/tmp/RPZ_Local_Processor.tar.gz 2>/dev/null || echo "    (無法顯示檔案資訊)"
-    rm -f /var/tmp/RPZ_Local_Processor.tar.gz
-    echo "    ✓ 部署套件已刪除"
+if [[ -z "$DATAGROUPS" ]]; then
+    echo "    (無 external DataGroups)"
 else
-    echo "    (部署套件不存在)"
+    # 篩選可能的 RPZ 相關 DataGroups
+    RPZ_DGS=""
+    for dg in $DATAGROUPS; do
+        case "$dg" in
+            rpztw|phishtw|rpzip|rpz.local|rpz_*)
+                RPZ_DGS="$RPZ_DGS $dg"
+                echo "    [RPZ] $dg"
+                ;;
+            *)
+                echo "    [其他] $dg"
+                ;;
+        esac
+    done
 fi
 
 echo ""
+if [[ -n "$RPZ_DGS" ]]; then
+    read -p "  是否移除 RPZ 相關 DataGroups? (y/N): " del_dg
 
-# ============================================
-# 步驟 7: 驗證清理結果
-# ============================================
-echo "[7/7] 驗證清理結果..."
+    if [[ "$del_dg" == "y" || "$del_dg" == "Y" ]]; then
+        for dg in $RPZ_DGS; do
+            # 先刪除 external data-group
+            tmsh delete ltm data-group external "$dg" 2>/dev/null && \
+                echo "  ✓ 已移除 DataGroup: $dg" || \
+                echo "  ✗ 移除失敗: $dg"
+
+            # 再刪除 data-group file
+            tmsh delete sys file data-group "$dg" 2>/dev/null || true
+        done
+    else
+        echo "  - 保留 DataGroups"
+    fi
+else
+    echo "  - 無 RPZ 相關 DataGroups"
+fi
+
+# =============================================================================
+# 儲存配置
+# =============================================================================
+
+echo ""
+echo "儲存配置..."
+
+tmsh save sys config 2>&1 | grep -v "api-status-warning" && \
+    echo "  ✓ 配置已儲存" || \
+    echo "  ⚠ 配置儲存可能有警告，請檢查"
+
+# =============================================================================
+# 驗證清理結果
+# =============================================================================
+
+echo ""
+echo "=== 驗證清理結果 ==="
 echo ""
 
-# 7.1 檢查 iCall 配置
-echo "  → 檢查 iCall 配置..."
-ICALL_COUNT=$(tmsh list sys icall handler periodic 2>/dev/null | grep -c "rpz_processor" || echo "0")
-if [[ "$ICALL_COUNT" == "0" ]]; then
-    echo "    ✓ 無 RPZ iCall 配置"
+ISSUES=0
+
+# 檢查 iCall
+if tmsh list sys icall handler periodic 2>/dev/null | grep -qE "rpz_update|rpz_processor"; then
+    echo "  ⚠ iCall 配置仍有殘留"
+    ISSUES=$((ISSUES + 1))
 else
-    echo "    ⚠ 仍有 $ICALL_COUNT 個 iCall 配置殘留"
+    echo "  ✓ iCall 配置已清除"
 fi
 
-# 7.2 檢查 DataGroups
-echo "  → 檢查 DataGroups..."
-DG_COUNT=$(tmsh list ltm data-group external 2>/dev/null | grep -E "rpztw|phishtw|rpzip" | grep -c "ltm data-group" || echo "0")
-if [[ "$DG_COUNT" == "0" ]]; then
-    echo "    ✓ 無 RPZ DataGroup"
+# 檢查目錄
+if [[ -d "$INSTALL_DIR" ]] || [[ -d "$OLD_INSTALL_DIR" ]]; then
+    echo "  ⚠ 程式目錄仍有殘留"
+    ISSUES=$((ISSUES + 1))
 else
-    echo "    ⚠ 仍有 $DG_COUNT 個 DataGroup 殘留"
-    echo "    殘留列表:"
-    tmsh list ltm data-group external 2>/dev/null | grep -E "rpztw|phishtw|rpzip" || true
+    echo "  ✓ 程式目錄已清除"
 fi
 
-# 7.3 檢查專案目錄
-echo "  → 檢查專案目錄..."
-if [[ -d "/var/tmp/RPZ_Local_Processor" ]]; then
-    echo "    ⚠ 專案目錄仍然存在"
-    ls -lh /var/tmp/RPZ_Local_Processor
+if [[ -d "$OUTPUT_DIR" ]] || [[ -d "$OLD_OUTPUT_DIR" ]]; then
+    echo "  ⚠ 輸出目錄仍有殘留"
+    ISSUES=$((ISSUES + 1))
 else
-    echo "    ✓ 專案目錄不存在"
+    echo "  ✓ 輸出目錄已清除"
 fi
 
-# 7.4 檢查輸出目錄
-echo "  → 檢查輸出目錄..."
-if [[ -d "/var/tmp/rpz_datagroups" ]]; then
-    echo "    ⚠ 輸出目錄仍然存在"
-    du -sh /var/tmp/rpz_datagroups
-else
-    echo "    ✓ 輸出目錄不存在"
-fi
-
-# 7.5 檢查 wrapper 檔案
-echo "  → 檢查 wrapper 檔案..."
-WRAPPER_COUNT=$(ls -1 /var/tmp/rpz_wrapper.* 2>/dev/null | wc -l)
-if [[ "$WRAPPER_COUNT" == "0" ]]; then
-    echo "    ✓ wrapper 檔案不存在"
-else
-    echo "    ⚠ 仍有 $WRAPPER_COUNT 個 wrapper 檔案殘留"
-    ls -lh /var/tmp/rpz_wrapper.* 2>/dev/null || true
-fi
-
-# 7.6 檢查部署套件
-echo "  → 檢查部署套件..."
-if [[ -f "/var/tmp/RPZ_Local_Processor.tar.gz" ]]; then
-    echo "    ⚠ 部署套件仍然存在"
-    ls -lh /var/tmp/RPZ_Local_Processor.tar.gz
-else
-    echo "    ✓ 部署套件不存在"
-fi
+# =============================================================================
+# 完成
+# =============================================================================
 
 echo ""
 echo "=========================================="
-echo "  清理完成!"
+if [[ $ISSUES -eq 0 ]]; then
+    echo "  ✅ 清除完成！環境已清理乾淨"
+else
+    echo "  ⚠️  清除完成，但有 $ISSUES 個項目需要檢查"
+fi
 echo "=========================================="
 echo ""
-
-# 檢查是否有任何殘留
-TOTAL_ISSUES=$((ICALL_COUNT + DG_COUNT + WRAPPER_COUNT))
-if [[ "$TOTAL_ISSUES" == "0" ]] && \
-   [[ ! -d "/var/tmp/RPZ_Local_Processor" ]] && \
-   [[ ! -d "/var/tmp/rpz_datagroups" ]] && \
-   [[ ! -f "/var/tmp/RPZ_Local_Processor.tar.gz" ]]; then
-    echo "✅ 環境已完全清理乾淨"
-    echo ""
-    echo "可以重新部署了:"
-    echo "  bash deploy.sh <F5_IP> [password]"
-else
-    echo "⚠️  仍有部分項目未清理完成，請檢查上方的驗證結果"
-fi
-
+echo "如需重新安裝:"
+echo "  1. 上傳部署套件到 /var/tmp"
+echo "  2. tar xzf rpz_local_processor_*.tar.gz"
+echo "  3. cd rpz_local_processor_*"
+echo "  4. bash install.sh"
 echo ""
