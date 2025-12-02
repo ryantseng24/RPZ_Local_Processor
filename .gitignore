@@ -7,9 +7,10 @@ logs/
 *.temp
 .*.swp
 
-# 壓縮檔案
+# 壓縮檔案與打包輸出
 *.tar.gz
 *.zip
+dist/
 
 # DNS Express 輸出檔案
 dnsxdump*.txt
