@@ -45,14 +45,30 @@ F5 BIG-IP 本地 RPZ 處理方案 - 將 DNS Express RPZ Zone 轉換為 External 
 
 ## 快速安裝
 
-### 1. 打包 (開發環境)
+### 1. 下載專案 (開發環境)
+
+```bash
+# 從 GitHub 下載專案
+git clone https://github.com/ryantseng24/RPZ_Local_Processor.git
+
+# 進入專案目錄
+cd RPZ_Local_Processor
+```
+
+如果沒有安裝 git，也可以直接下載 ZIP：
+1. 前往 https://github.com/ryantseng24/RPZ_Local_Processor
+2. 點擊綠色 "Code" 按鈕
+3. 選擇 "Download ZIP"
+4. 解壓縮後進入目錄
+
+### 2. 打包
 
 ```bash
 bash package.sh
 # 輸出: dist/rpz_local_processor_v1.2_YYYYMMDD_HHMMSS.tar.gz
 ```
 
-### 2. 部署 (F5 設備)
+### 3. 部署 (F5 設備)
 
 ```bash
 # 上傳到 F5
@@ -65,7 +81,7 @@ cd rpz_local_processor_*
 bash install.sh
 ```
 
-### 3. 配置 Zone 清單
+### 4. 配置 Zone 清單
 
 ```bash
 vi /config/snmp/RPZ_Local_Processor/config/zonelist.txt
@@ -78,13 +94,13 @@ phishtw
 rpz.local
 ```
 
-### 4. 測試執行
+### 5. 測試執行
 
 ```bash
 bash /config/snmp/RPZ_Local_Processor/scripts/main.sh --force
 ```
 
-### 5. 設定定期執行
+### 6. 設定定期執行
 
 ```bash
 bash /config/snmp/RPZ_Local_Processor/config/icall_setup_api.sh
