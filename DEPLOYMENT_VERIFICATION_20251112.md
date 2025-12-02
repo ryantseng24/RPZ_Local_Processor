@@ -85,16 +85,11 @@ bash deploy.sh 10.8.34.22 uniforce
 
 ### 步驟 3: 手動建立 DataGroups ✅
 
-**問題發現**:
-F5 有兩個層級的概念：
-1. `sys file data-group` - 資料檔案對象（由 deploy.sh 測試執行時自動建立）
-2. `ltm data-group external` - 外部 DataGroup 對象（需手動建立）
-
 **執行動作**:
 ```bash
 # 建立 external data-group，引用已存在的 file
-tmsh create ltm data-group external rpztw external-file-name rpztw
-tmsh create ltm data-group external phishtw external-file-name phishtw
+tmsh create ltm data-group external rpztw source-path file:/var/tmp/rpz_datagroups/final/rpz.txt type string
+tmsh create ltm data-group external phishtw source-path file:/var/tmp/rpz_datagroups/final/phishtw.txt type string
 tmsh save sys config
 ```
 

@@ -38,3 +38,9 @@ datagroups_output/
 # F5 特定
 *.qkview
 *.ucs
+
+# 簡報與資料檔案
+*.pptx
+*.csv
+F5_rpztw_data_group.txt
+infoblox_rpz_data.csv
