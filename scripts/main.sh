@@ -36,6 +36,17 @@ CLEANUP_TEMP="${CLEANUP_TEMP:-true}"
 # 是否強制執行 (跳過 SOA 檢查)
 FORCE_RUN="${FORCE_RUN:-false}"
 
+# 暫存檔保留數量上限（每個檔案家族）。與天數上限並用，取先到者。
+# 接受範圍 1~99999；範圍外或非數字回退預設 24（防 bash 整數溢位）。
+RPZ_KEEP_COUNT="${RPZ_KEEP_COUNT:-24}"
+if ! [[ "$RPZ_KEEP_COUNT" =~ ^[1-9][0-9]{0,4}$ ]]; then
+    log_warn "RPZ_KEEP_COUNT 非法或超出範圍 1-99999（${RPZ_KEEP_COUNT}），改用預設 24"
+    RPZ_KEEP_COUNT=24
+fi
+
+# cleanup 只執行一次（成功路徑先呼叫，EXIT trap 補所有其他路徑）
+CLEANUP_RAN="false"
+
 # =============================================================================
 # 初始化
 # =============================================================================
@@ -72,26 +83,108 @@ init() {
 # 清理臨時檔案
 # =============================================================================
 
+# 時間戳的精確 glob 形狀: 8 位日期 _ 6 位時間
+TS_GLOB='[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_[0-9][0-9][0-9][0-9][0-9][0-9]'
+
+prune_family() {
+    # prune_family <目錄> <家族前綴> <副檔名> <保留數>
+    # 家族成員 = <前綴>_<8位日期>_<6位時間><副檔名> 的精確形狀。
+    # 前綴以字面比對（引號展開），不作為 glob 使用：
+    # alpha 家族不會選中 alpha_beta 家族的檔案（P1B-08）。
+    # 檔名時間戳使 glob 展開的字典序即時間序。
+    # 純 bash 迴圈，不用管線（SIGPIPE 根因見 process.md 第 13 節）。
+    local dir="$1" prefix="$2" ext="$3" keep="$4"
+    local files=() f i del
+    for f in "$dir/${prefix}"_${TS_GLOB}"${ext}"; do
+        [[ -f "$f" ]] || continue
+        files+=("$f")
+    done
+    del=$(( ${#files[@]} - keep ))
+    (( del > 0 )) || return 0
+    local deleted=0 failed=0
+    for (( i = 0; i < del; i++ )); do
+        if rm -f -- "${files[$i]}" 2>/dev/null; then
+            deleted=$((deleted + 1))
+        else
+            failed=$((failed + 1))
+        fi
+    done
+    if (( failed > 0 )); then
+        log_warn "數量上限清理: ${dir##*/}/${prefix} 家族應刪 ${del} 個，實際刪除 ${deleted} 個，失敗 ${failed} 個（實際保留數超過 ${keep}）"
+    else
+        log_info "數量上限清理: ${dir##*/}/${prefix} 家族刪除 ${deleted} 個，保留 ${keep} 個"
+    fi
+}
+
+prune_parsed_families() {
+    # 從 parsed/ 檔名推導家族前綴（zone 名），逐家族套用數量上限。
+    # 不讀 zonelist.txt：zone 增減自動適應，也不引入新的解析路徑。
+    local dir="$1" keep="$2"
+    local f name prefix
+    declare -A seen
+    for f in "$dir"/*_[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_[0-9][0-9][0-9][0-9][0-9][0-9].txt; do
+        [[ -f "$f" ]] || continue
+        name="${f##*/}"
+        [[ "$name" =~ ^(.+)_[0-9]{8}_[0-9]{6}\.txt$ ]] || continue
+        prefix="${BASH_REMATCH[1]}"
+        # 前綴只接受本專案會產生的安全字元，避免被當成 glob 使用
+        if [[ "$prefix" =~ ^[A-Za-z0-9._-]+$ ]]; then
+            seen["$prefix"]=1
+        else
+            log_warn "略過不安全的家族前綴（僅由天數上限管理）: ${name}"
+        fi
+    done
+    (( ${#seen[@]} > 0 )) || return 0    # bash 4.2: 空陣列展開會踩 set -u
+    for prefix in "${!seen[@]}"; do
+        prune_family "$dir" "$prefix" ".txt" "$keep"
+    done
+}
+
 cleanup() {
     if [[ "$CLEANUP_TEMP" != "true" ]]; then
         log_info "跳過清理臨時檔案"
         return 0
     fi
 
-    log_info "清理臨時檔案..."
+    # 只清 raw/ 與 parsed/，不遞迴掃 OUTPUT_DIR。
+    # final/ 是 DataGroup 的 source-path，刪除即影響服務（實測見 process.md 第 15 節）。
+    if [[ -d "$OUTPUT_DIR/raw" ]]; then
+        if ! find "$OUTPUT_DIR/raw" -maxdepth 1 -type f -mtime +7 -delete 2>/dev/null; then
+            log_warn "天數上限清理失敗（raw/ 有檔案無法刪除）"
+        fi
+    fi
+    if [[ -d "$OUTPUT_DIR/parsed" ]]; then
+        if ! find "$OUTPUT_DIR/parsed" -maxdepth 1 -type f -mtime +7 -delete 2>/dev/null; then
+            log_warn "天數上限清理失敗（parsed/ 有檔案無法刪除）"
+        fi
+    fi
 
-    # 清理超過 7 天的舊檔案
-    find "$OUTPUT_DIR" -type f -mtime +7 -delete 2>/dev/null || true
-    log_info "清理舊檔案完成"
+    prune_family "$OUTPUT_DIR/raw" "dnsxdump" ".out" "$RPZ_KEEP_COUNT"
+    prune_parsed_families "$OUTPUT_DIR/parsed" "$RPZ_KEEP_COUNT"
 
-    # 清理當前執行產生的中間檔案
+    # 缺陷 A（Phase 2）: DNSXDUMP_FILE 由 extract_rpz.sh 子行程 export，
+    # 傳不回本行程，此分支從未執行。本次保留原樣。
     if [[ -n "${DNSXDUMP_FILE:-}" && -f "$DNSXDUMP_FILE" ]]; then
         rm -f "$DNSXDUMP_FILE" || true
         log_info "清理 dnsxdump 檔案完成"
     fi
 
-    log_info "cleanup 函數完成"
     return 0
+}
+
+run_cleanup_once() {
+    if [[ "$CLEANUP_RAN" == "true" ]]; then
+        return 0
+    fi
+    CLEANUP_RAN="true"
+    cleanup
+}
+
+on_exit() {
+    # 先保存退出碼，清理後原樣回傳，不改變 wrapper 記錄的語意。
+    local rc=$?
+    run_cleanup_once || true
+    exit "$rc"
 }
 
 # =============================================================================
@@ -172,7 +265,7 @@ main() {
     fi
 
     # 清理臨時檔案
-    cleanup
+    run_cleanup_once
 
     # 統計執行時間
     local end_time=$(date +%s)
@@ -213,6 +306,7 @@ show_usage() {
   LOG_FILE             日誌檔案位置 (預設: /var/log/ltm)
   DNSXDUMP_CMD         dnsxdump 指令路徑 (預設: /usr/local/bin/dnsxdump)
   LOG_LEVEL            日誌等級 0-3 (預設: 1=INFO)
+  RPZ_KEEP_COUNT       暫存檔每家族保留數量上限 (預設: 24，範圍 1-99999)
 
 EOF
 }
@@ -251,6 +345,9 @@ done
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     # 設定 trap 處理錯誤
     trap 'log_error "執行過程發生錯誤，退出碼: $?"' ERR
+
+    # 所有 exit 路徑（成功、NO_UPDATE、失敗）都執行清理（Phase 1B）
+    trap on_exit EXIT
 
     main "$@"
 fi
