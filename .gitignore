@@ -10,7 +10,10 @@ logs/
 # 壓縮檔案與打包輸出
 *.tar.gz
 *.zip
-dist/
+*.sha256
+dist/*
+# 但保留部署 artifact 的狀態說明（哪些包不可部署）
+!dist/DO_NOT_DEPLOY.md
 
 # DNS Express 輸出檔案
 dnsxdump*.txt
@@ -45,3 +48,16 @@ datagroups_output/
 *.csv
 F5_rpztw_data_group.txt
 infoblox_rpz_data.csv
+# 客戶交付文件與診斷資料（不進 repo）
+客戶診斷資料_*/
+RPZ_修正報告_客戶版*.md
+RPZ_部署SOP_客戶版*.md
+RPZ_手動清檔作業說明*.md
+*.docx
+*.pdf
+*.JPG
+*.jpg
+~$*
+
+# patch 的 SHA-256 sidecar 是審核要求的交付物，自 *.sha256 排除中還原
+!patches/*.sha256
