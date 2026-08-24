@@ -7,7 +7,7 @@
 | 建置日期 | 2026-08-22 |
 | 適用對象 | BIG-IP 17.1.x，RPZ_Local_Processor v1.2（腳本 md5 見第 2 節） |
 | 規模 | 876 行（內嵌檔案 608 行 + 工具邏輯 268 行） |
-| 外部審核 | 兩輪 CONDITIONAL GO（`CODE_REVIEW_V4_STE100_20260822.md`、`CODE_REVIEW_V4_ROUND2_STE100_20260822.md`）。V4-01～05 與 R2-V4-01～03 已修正並重驗 |
+| 外部審核 | 兩輪 CONDITIONAL GO（`docs/reviews/CODE_REVIEW_V4_STE100_20260822.md`、`docs/reviews/CODE_REVIEW_V4_ROUND2_STE100_20260822.md`）。V4-01～05 與 R2-V4-01～03 已修正並重驗 |
 
 ## 1. 問題摘要
 
@@ -220,7 +220,7 @@ v4 重構與審核回應的完整記錄見 `process.md` 第 19~21 節。
 | 規模 | 591 行（內嵌 main.sh 357 行 + 工具邏輯 234 行） |
 | 變更 | 只換 `main.sh`（原版 `0041c1d7…` -> 修正版 `d1e1f688…`） |
 | 前提 | **先套用並驗證 v4**。兩個 patch 無程式碼相依，可各自 rollback |
-| 外部審核 | 兩輪 CONDITIONAL GO（`CODE_REVIEW_PHASE1B_STE100_20260823.md`、`…_ROUND2_…`）。P1B-01～04、07、08 已修正並重驗；P1B-05/06 屬安裝包（HOLD），不影響 patch |
+| 外部審核 | 兩輪 CONDITIONAL GO（`docs/reviews/CODE_REVIEW_PHASE1B_STE100_20260823.md`、`…_ROUND2_…`）。P1B-01～04、07、08 已修正並重驗；P1B-05/06 屬安裝包（HOLD），不影響 patch |
 | 設計文件 | `docs/PHASE1B_DESIGN_20260823.md` |
 
 ### 8.1 修正內容

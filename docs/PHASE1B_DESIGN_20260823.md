@@ -298,7 +298,7 @@ gate 擴充：`tests/check_source_consistency.sh` 增加對 1B patch 的
 ### 6.5 完成後
 
 gate（含 1B 檢查）RC=0、兩個 sidecar RC=0、更新
-`REVIEW_HANDOFF_PHASE1B.md`（新檔）後送 Codex。
+`docs/reviews/REVIEW_HANDOFF_PHASE1B.md`（新檔）後送 Codex。
 
 ---
 

@@ -3,7 +3,7 @@
 **建立日期**: 2026-08-20
 **最後更新**: 2026-08-21（v6，含兩輪獨立審核回應）
 **狀態**: 根因已確認。patch 經兩輪獨立審核，兩輪均判定 NO-GO，兩輪的第一階段 findings 都已修正並在 LAB 重新驗收。**待第三輪審核與正式機上線**。
-**審核報告**: `CODE_REVIEW_20260821.md`（第一輪，回應見第 16 節）、`CODE_REVIEW_PHASE1A_ROUND2_20260821.md`（第二輪，回應見第 17 節）。
+**審核報告**: `docs/reviews/CODE_REVIEW_20260821.md`（第一輪，回應見第 16 節）、`docs/reviews/CODE_REVIEW_PHASE1A_ROUND2_20260821.md`（第二輪，回應見第 17 節）。
 **現行 patch**: `patches/rpz_patch_sigpipe_v3.sh`。v1、v2 已作廢，見 `patches/README.md`。
 **影響設備**: 設備A、設備B、設備C、設備D（四台全部）
 **服務對象**: 客戶 cache DNS
@@ -920,7 +920,7 @@ iCall (300s)
 | 檔案 | md5 | 說明 |
 |---|---|---|
 | `process.md` | — | 本文件 |
-| `CODE_REVIEW_20260821.md` | — | 獨立審核報告，見第 16 節 |
+| `docs/reviews/CODE_REVIEW_20260821.md` | — | 獨立審核報告，見第 16 節 |
 | `RPZ_手動清檔作業說明_20260821.md` | — | 給經銷商工程師的緊急處置作業說明（v2），指令已在 LAB 逐字驗證 |
 | `patches/rpz_patch_sigpipe_v3.sh` | `685afe4c3e817abeb6a1861510a120f9` | **現行**上線用的 patch 腳本 |
 | ~~`patches/rpz_patch_sigpipe_v1.sh`~~ | `89fd74eb37ba512ede739df876040662` | **已作廢並移除**（第一輪 CR-01），紀錄見 `patches/README.md` |
@@ -954,7 +954,7 @@ iCall (300s)
 
 ## 16. 獨立審核回應與 Phase 1A 修正
 
-2026-08-21 由獨立 review 產出 `CODE_REVIEW_20260821.md`，對第一版 patch
+2026-08-21 由獨立 review 產出 `docs/reviews/CODE_REVIEW_20260821.md`，對第一版 patch
 （`patches/rpz_patch_sigpipe_v1.sh`）判定 **NO-GO**。本節記錄回應與修正。
 
 審核確認 root cause 與 `find_newest_file()` 的方向正確，NO-GO 的原因全部在
@@ -1188,7 +1188,7 @@ iCall handler 舊名稱也還沒改。
 
 ## 17. 第二輪獨立審核回應
 
-2026-08-21 第二輪審核產出 `CODE_REVIEW_PHASE1A_ROUND2_20260821.md`，對
+2026-08-21 第二輪審核產出 `docs/reviews/CODE_REVIEW_PHASE1A_ROUND2_20260821.md`，對
 Phase 1A（patch v2）判定 **NO-GO**，提出 R2-01 ~ R2-07。
 
 審核確認核心 SIGPIPE 修正、CR-01 的 missing artifact 硬失敗、CR-02 的 assertion
@@ -1413,7 +1413,7 @@ LAB 期間所有測試 fixture 都在 `/var/tmp` 隔離目錄，已清除。
 
 ## 18. 第三輪修訂版審核回應
 
-2026-08-21 第三輪修訂版審核 `CODE_REVIEW_PHASE1A_ROUND3_REV2_20260821.md`
+2026-08-21 第三輪修訂版審核 `docs/reviews/CODE_REVIEW_PHASE1A_ROUND3_REV2_20260821.md`
 （SHA-256 `1d7e9412d00cdabfa9d944825803deadfb0c3836e2689a98e012b13e648342c6`，已核對相符）
 判定：
 
@@ -1437,7 +1437,7 @@ LAB 期間所有測試 fixture 都在 `/var/tmp` 隔離目錄，已清除。
 | 4.1 | patch 外部 SHA-256 sidecar | 完成。`patches/rpz_patch_sigpipe_v3.sh.sha256`，內容只有 basename。F5 上 `sha256sum -c` 退出碼 0 |
 | 4.2 | cleanup false-success | 完成，選擇直接小修。新增 `validate_data_subdirs()` 與 `CLEANUP_UNSAFE_LOG`，symlink 子目錄一律拒絕且不部分刪除 |
 | 4.3 | 中止與恢復 SOP | 完成。10 步驟 SOP 在 `patches/README.md`，含退出碼判讀表與中止/回復對照表 |
-| 4.4 | 改檔後重建 hash 與重跑 gate | 完成。所有 hash 在最後一次修改後才計算，詳見 `REVIEW_HANDOFF_PHASE1A.md` 第 4、6 節 |
+| 4.4 | 改檔後重建 hash 與重跑 gate | 完成。所有 hash 在最後一次修改後才計算，詳見 `docs/reviews/REVIEW_HANDOFF_PHASE1A.md` 第 4、6 節 |
 
 ### 18.2 額外修掉的項目
 
@@ -1590,7 +1590,7 @@ iCall handler active（300 秒）、`main.sh --force` e2e 兩次 RC=0、
 
 ## 20. v4 第一輪審核回應（2026-08-22）
 
-審核文件：`CODE_REVIEW_V4_STE100_20260822.md`
+審核文件：`docs/reviews/CODE_REVIEW_V4_STE100_20260822.md`
 （SHA-256 `9cd9d60664e6fbd7ffa3bcd072641907109c3ad5058111fce58fb82905e993d8`，已核對）。
 判定 **CONDITIONAL GO**：runtime 設計可接受，V4-01～V4-04 為上線前必要修正，
 V4-05 同步修文檔。審核明確要求維持最小化設計，不恢復 v3 的 transaction、
@@ -1652,7 +1652,7 @@ condition 14（更新 handoff）與本節同步完成。
 
 ## 21. v4 第二輪審核回應（2026-08-22）
 
-審核文件：`CODE_REVIEW_V4_ROUND2_STE100_20260822.md`
+審核文件：`docs/reviews/CODE_REVIEW_V4_ROUND2_STE100_20260822.md`
 （SHA-256 `7577ca0446e53b5911610f574a6ad94c34989c44adf50c79e0b147c14cf9c8ae`，已核對）。
 判定 **CONDITIONAL GO**。第一輪五項中 V4-02（新條件）、V4-03、V4-04、V4-05
 關閉，V4-01 的 runtime 部分關閉。審核者獨立重跑 gate（PASS=26）、
@@ -1764,7 +1764,7 @@ handler active/300、config saved、final/ 正常（revision 21）。
 
 ## 23. Phase 1B 第一輪審核回應（2026-08-23）
 
-審核文件：`CODE_REVIEW_PHASE1B_STE100_20260823.md`
+審核文件：`docs/reviews/CODE_REVIEW_PHASE1B_STE100_20260823.md`
 （SHA-256 `7329d2c8f394f49d407aebf6f416037defe0c7f8fad901881f5e21abd2c98e3f`，已核對）。
 判定分列：production patch **CONDITIONAL GO**、e2e 驅動器 **NO-GO**、
 v1.2.2 安裝包 **NO-GO**、CR-10 升 **Phase 2 P0**。
@@ -1819,7 +1819,7 @@ config saved、revision 22。備份：`rpz_patch1b_backup_20260823_015040`
 
 ## 24. Phase 1B 第二輪審核回應（2026-08-23）
 
-審核文件：`CODE_REVIEW_PHASE1B_ROUND2_STE100_20260823.md`
+審核文件：`docs/reviews/CODE_REVIEW_PHASE1B_ROUND2_STE100_20260823.md`
 （SHA-256 `f72f0298…`，已核對）。判定 CONDITIONAL GO：P1B-02/03/04 關閉、
 P1B-01 降 Medium 部分關閉、P1B-07 維持、新增 **P1B-08**（Medium）。
 審核者獨立重跑迴歸 104、gate 31、deterministic 重建、並確認 LAB 收尾正常。
@@ -1876,7 +1876,7 @@ handler active/300、revision 23、config saved。
 
 ## 25. Phase 1B 第三輪短確認回應（2026-08-23）
 
-審核文件：`CODE_REVIEW_PHASE1B_ROUND3_STE100_20260823.md`
+審核文件：`docs/reviews/CODE_REVIEW_PHASE1B_ROUND3_STE100_20260823.md`
 （SHA-256 `09bd82b4…`，已核對）。判定：**production patch runtime GO**、
 P1B-01 與 P1B-08 關閉、e2e 驅動器 GO（僅限指定 LAB）、
 **canary 於文件修正後 GO**、v1.2.2 package 維持 HOLD、CR-10 維持 Phase 2 P0。

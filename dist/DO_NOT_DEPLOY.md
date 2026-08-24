@@ -47,7 +47,7 @@ SHA-256: b963cf213214ab203766ab38dc4b7d1e7e440715f5afd0aad85e4309dbab1682
   manifest 未涵蓋的可安裝檔案也拒絕；路徑覆寫有安全邊界
 - 兩輪獨立審核的第一階段 findings 已修正並通過驗收矩陣
 
-**上線前仍需要的條件**（見 `CODE_REVIEW_PHASE1A_ROUND2_20260821.md` 第 13 節）：
+**上線前仍需要的條件**（見 `docs/reviews/CODE_REVIEW_PHASE1A_ROUND2_20260821.md` 第 13 節）：
 
 1. 第三輪獨立審核通過。
 2. 取得四台正式機的 `tmsh show sys version` 與 `md5sum scripts/*.sh`，
