@@ -57,31 +57,59 @@ prepare_final_datagroups() {
     read -ra zones <<< "$zone_list_str"
     log_info "處理 ${#zones[@]} 個 Zones: ${zones[*]}"
 
-    local count=0
-
-    # 處理每個 zone
+    # -------------------------------------------------------------------------
+    # 第一階段：解析所有來源檔案，全部確認齊全才進入發布階段。
+    #
+    # 找不到 parsed artifact 必須硬失敗。原版靠 ls 的非零退出碼 + pipefail
+    # 達到這個效果；改用 find_newest_file 後必須明確 die，不可讓 missing
+    # artifact 落入 touch final 的成功分支。
+    # 兩階段的目的是避免「前面的 zone 已經 cp 完、後面的 zone 缺檔才 die」
+    # 造成 final/ 部分發布。
+    # 參見 CODE_REVIEW_20260821.md CR-01。
+    # -------------------------------------------------------------------------
+    local -a src_zone=() src_file=()
+    local zone parsed_file
     for zone in "${zones[@]}"; do
-        local parsed_file
-        parsed_file=$(ls -t "${PARSED_DATA_DIR}/${zone}_"*.txt 2>/dev/null | head -1)
-
-        if [[ -f "$parsed_file" ]]; then
-            cp "$parsed_file" "${FINAL_OUTPUT_DIR}/${zone}.txt"
-            local record_count
-            record_count=$(wc -l < "$parsed_file")
-            log_info "✓ ${zone} DataGroup: ${FINAL_OUTPUT_DIR}/${zone}.txt ($record_count 筆)"
-            count=$((count + 1))
-        else
-            # 建立空檔案
-            touch "${FINAL_OUTPUT_DIR}/${zone}.txt"
-            log_debug "  ${zone}: 無記錄 (建立空檔案)"
+        if ! parsed_file=$(find_newest_file "${PARSED_DATA_DIR}/${zone}_"*.txt); then
+            die "找不到 ${zone} 的解析檔案: ${PARSED_DATA_DIR}/${zone}_*.txt"
         fi
+        [[ -f "$parsed_file" ]] || die "${zone} 的解析檔案不存在: $parsed_file"
+
+        if [[ ! -s "$parsed_file" ]]; then
+            log_warn "${zone} 的解析檔案為 0 bytes: $parsed_file"
+        fi
+
+        src_zone+=("$zone")
+        src_file+=("$parsed_file")
     done
 
-    # 處理 IP DataGroup (rpzip)
+    # rpzip 的 artifact 必須存在，但允許內容為空 (目前來源沒有 IP 類型記錄)
     local ip_file
-    ip_file=$(ls -t "${PARSED_DATA_DIR}"/rpzip_*.txt 2>/dev/null | head -1)
+    if ! ip_file=$(find_newest_file "${PARSED_DATA_DIR}"/rpzip_*.txt); then
+        die "找不到 rpzip 的解析檔案: ${PARSED_DATA_DIR}/rpzip_*.txt"
+    fi
+    [[ -f "$ip_file" ]] || die "rpzip 的解析檔案不存在: $ip_file"
 
-    if [[ -f "$ip_file" && -s "$ip_file" ]]; then
+    # -------------------------------------------------------------------------
+    # 第二階段：發布
+    #
+    # 注意：這裡【不是】完整的 publish transaction。第一階段確保「缺 artifact
+    # 時不會部分發布」，但發布階段仍是逐一 cp/touch 正式檔案，若某次 cp 中途
+    # 失敗，前面已寫入的 final 檔案不會回復。
+    # 完整的原子發布（temp + rename、run manifest、資料完整性門檻）屬於
+    # CODE_REVIEW_20260821.md 的 CR-10，尚未實作。
+    # 參見 CODE_REVIEW_PHASE1A_ROUND2_20260821.md 第 9.1 節。
+    # -------------------------------------------------------------------------
+    local count=0 i=0 record_count
+    while [[ $i -lt ${#src_zone[@]} ]]; do
+        cp "${src_file[$i]}" "${FINAL_OUTPUT_DIR}/${src_zone[$i]}.txt"
+        record_count=$(wc -l < "${src_file[$i]}")
+        log_info "✓ ${src_zone[$i]} DataGroup: ${FINAL_OUTPUT_DIR}/${src_zone[$i]}.txt ($record_count 筆)"
+        count=$((count + 1))
+        i=$((i + 1))
+    done
+
+    if [[ -s "$ip_file" ]]; then
         cp "$ip_file" "${FINAL_OUTPUT_DIR}/rpzip.txt"
         local ip_count
         ip_count=$(wc -l < "$ip_file")

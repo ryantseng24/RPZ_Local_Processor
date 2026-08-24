@@ -148,6 +148,38 @@ sanitize_input() {
 }
 
 # =============================================================================
+# 取得符合 glob 的最新檔案 (依 mtime)
+# =============================================================================
+# 刻意不使用 `ls -t <glob> | head -1`。在 set -o pipefail 下，ls 對 pipe 的
+# stdio write buffer 是 4096 bytes，輸出超過就需要多次 write()。head -1 取到
+# 第一行即結束並關閉 pipe，ls 後續的 write() 收到 SIGPIPE 而以 141 結束。
+# pipefail 讓管線回傳 141，set -e 隨即終止腳本，且不留任何錯誤訊息。
+# 這是時序競態，機率隨檔案數上升。
+# BIG-IP 17.1.3.1 實測 (真實 parse_rpz.sh，每組 30 次):
+#   67 檔/4087B 0%、80 檔/4880B 17%、141 檔/8601B 80%、179 檔/10919B 87%
+#
+# 用法:
+#   if ! newest=$(find_newest_file "$dir"/glob_*.txt); then
+#       die "找不到檔案"
+#   fi
+#
+# 回傳 0 並輸出路徑；完全沒有符合的檔案時回傳 1 且不輸出。
+# 呼叫端必須明確處理回傳 1 的情況，不要用 `|| var=""` 把「找不到」
+# 轉成成功控制流 (參見 CODE_REVIEW_20260821.md CR-01)。
+
+find_newest_file() {
+    local newest="" f
+    for f in "$@"; do
+        [[ -f "$f" ]] || continue
+        if [[ -z "$newest" || "$f" -nt "$newest" ]]; then
+            newest="$f"
+        fi
+    done
+    [[ -n "$newest" ]] || return 1
+    printf '%s\n' "$newest"
+}
+
+# =============================================================================
 # 匯出函數 (如果被 source)
 # =============================================================================
 
@@ -155,7 +187,7 @@ if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
     # 被 source 時匯出所有函數
     export -f log_debug log_info log_warn log_error
     export -f die check_command
-    export -f ensure_dir backup_file read_config
+    export -f ensure_dir backup_file read_config find_newest_file
     export -f timestamp timestamp_compact
     export -f timer_start timer_end timer_format
     export -f is_valid_ip is_valid_domain sanitize_input

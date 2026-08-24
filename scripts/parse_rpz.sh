@@ -224,8 +224,11 @@ main() {
         dnsxdump_file="$DNSXDUMP_FILE"
     else
         # 尋找最新的 dnsxdump 檔案
-        dnsxdump_file=$(ls -t "${RAW_DATA_DIR}"/dnsxdump_*.out 2>/dev/null | head -1)
-        [[ -f "$dnsxdump_file" ]] || die "找不到 dnsxdump 輸出檔案"
+        # 不用 ls|head，見 utils.sh 的 find_newest_file
+        if ! dnsxdump_file=$(find_newest_file "${RAW_DATA_DIR}"/dnsxdump_*.out); then
+            die "找不到 dnsxdump 輸出檔案: ${RAW_DATA_DIR}/dnsxdump_*.out"
+        fi
+        [[ -f "$dnsxdump_file" ]] || die "dnsxdump 輸出檔案不存在: $dnsxdump_file"
     fi
 
     log_info "使用 dnsxdump 檔案: $dnsxdump_file"
