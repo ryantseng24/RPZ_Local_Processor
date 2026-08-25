@@ -74,7 +74,7 @@ md5 整批核對、pgrep guard、原子取代）。**審核重點應是 payload
 
 | # | 變更 | 理由與依據 |
 |---|---|---|
-| 1 | cleanup 的 find 從遞迴掃 `OUTPUT_DIR` 縮小到 `raw/` `parsed/`（`-maxdepth 1`） | `final/` 是 DataGroup source-path。實測 D：加 trap 而不縮小範圍，停滯機器的 final/ 被刪到 0（process.md 第 15 節） |
+| 1 | cleanup 的 find 從遞迴掃 `OUTPUT_DIR` 縮小到 `raw/` `parsed/`（`-maxdepth 1`） | `final/` 是 DataGroup source-path。實測 D：加 trap 而不縮小範圍，停滯機器的 final/ 被刪到 0（process.md 第 27 節） |
 | 2 | 新增 `prune_family()` `prune_parsed_families()`：每家族保留最新 24 個（精確時間戳形狀選取） | 純 bash 零管線；家族前綴由檔名推導，不解析 zonelist（v3 cleanup 的教訓）；bash 4.2 空陣列 set -u 陷阱已防 |
 | 3 | `RPZ_KEEP_COUNT` 環境變數（預設 24），非法值回退並警告 | 使用者定案 KEEP=24（磁碟上限 403 MB、平日回溯 12 小時） |
 | 4 | `trap on_exit EXIT` + `run_cleanup_once`：全部 exit 路徑清理，退出碼原樣保留 | 六個 exit 路徑中原本只有成功路徑清理；停滯即累積到磁碟告警 |

@@ -13,7 +13,8 @@
 
 三處 `ls -t <glob> | head -1` 在 `set -o pipefail` 下不安全。`ls` 輸出超過
 4096 bytes（約 67 個暫存檔）時收到 SIGPIPE 以 141 結束，`set -e` 讓腳本
-靜默中止，RPZ 黑名單停止更新。完整分析見 `process.md` 第 13 節。
+靜默中止，RPZ 黑名單停止更新。完整分析見 `process.md` 第 2 節，
+完整實測數據見第 6 節。
 
 判別方法：`rpz_wrapper.log` 出現「載入 N 個 Zones」後直接
 「`[ERROR] RPZ 解析失敗`」，中間缺「`[INFO] 使用 dnsxdump 檔案:`」。
@@ -273,3 +274,19 @@ v4 重構與審核回應的完整記錄見 `process.md` 第 19~21 節。
 已修復並促成本 fail-closed 版驅動器（審核 P1B-01）。完整分析見
 `process.md` 第 22~24 節——這同時是 CR-10 的活體證據，審核已把
 CR-10 列為 Phase 2 P0。
+
+## 9. 勘誤（payload 註解的章節號筆誤）
+
+`main.sh`（與兩個 patch 的內嵌副本）有兩處註解引用了錯誤的
+`process.md` 章節號：
+
+| 註解位置 | 寫的是 | 實際應為 |
+|---|---|---|
+| `prune_family()` 的 SIGPIPE 根因引用 | 第 13 節 | 第 2 節（實測數據第 6 節） |
+| `cleanup()` 的 final/ 實測引用 | 第 15 節 | 第 27 節 |
+
+只是註解，不影響任何行為。因為修改會變更已審核並交付的 patch
+SHA-256（`aa97950e…` 已寫入客戶 SOP），本次不重建，
+排入下一次 payload 變更時一併修正。
+`docs/PHASE1B_DESIGN_20260823.md` 第 3 節的程式碼樣本與實作
+逐字一致，因此保留同樣的筆誤。

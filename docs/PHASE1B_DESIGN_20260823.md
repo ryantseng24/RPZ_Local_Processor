@@ -33,7 +33,7 @@
 
 | 事實 | 出處 |
 |---|---|
-| 測試 D：先加 `trap EXIT` 而不縮小 find，停滯機器的 `final/` 會被刪到 0 個 | `process.md` 第 15 節 |
+| 測試 D：先加 `trap EXIT` 而不縮小 find，停滯機器的 `final/` 會被刪到 0 個 | `process.md` 第 27 節 |
 | 測試 E：find 縮小到 `raw/` + `parsed/` 後，`final/` 保留、舊檔仍清除 | 同上 |
 | 平日 18 次/日、每次 16.8 MB；KEEP=24 → 磁碟用量估計 403 MB（現況家族數與平均檔案大小；`/config` 12.6%）、平日可回溯 12 小時 | `STATUS_20260822.md` 第 4 節 |
 | 檔名 `{prefix}_YYYYMMDD_HHMMSS.{ext}`，glob 字典序 = 時間序 | LAB 實查 raw/ 與 parsed/ |

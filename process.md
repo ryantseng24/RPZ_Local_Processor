@@ -1550,7 +1550,7 @@ root:webusers 755，與其他四支一致。
 
 **原版失敗曲線重現**（真實 `parse_rpz.sh`，每組 10 次）：n≤67 全過，
 n=80 起出現 exit 141（2/10），n=141 7/10，n=179 8/10，n=300 9/10。
-與第 13 節的 30 次曲線一致，證實恢復有效。
+與第 6 節的 30 次曲線一致，證實恢復有效。
 
 **v4 測試矩陣**：T1 sha256 傳輸、T2 check 原版、T3 版本不明整批拒絕
 （無備份、不動其他檔）、T5 main.sh 執行中拒絕（列出 main.sh 與
@@ -1943,3 +1943,31 @@ raw=24/parsed=72、dig 已無回應。LAB 回到乾淨狀態。
 
 這是兩個 patch 上 canary 前的最後一項驗證：真實來源、真實排程、
 真實查詢面，含刪除方向的同步。
+
+---
+
+## 27. 補錄：cleanup 刪除範圍實測（測試 A~E）
+
+本節內容是對話壓縮前（2026-08-22 之前）完成的實測，先前只記錄於
+`STATUS_20260822.md` 第 9 節，未寫入本檔。payload 註解與部分文件
+以「第 15 節」引用此內容，實際應指本節（見 `patches/README.md` 的
+勘誤說明）。
+
+背景：原版 `main.sh:84` 的 `find "$OUTPUT_DIR" -type f -mtime +7 -delete`
+是遞迴掃描，範圍涵蓋 `final/`（DataGroup 的 source-path）。
+
+| 測試 | 條件 | 結果 |
+|---|---|---|
+| A | 原版成功執行，`final/` 檔案 mtime 為 30 天前 | `final/` 保留 3 個（步驟 4 先寫入，mtime 變新才逃過刪除） |
+| B | zone 已從 zonelist 移除（該 zone 的 final 檔不再被重寫） | `final/oldzone.txt` **被刪除** |
+| D | **在原版加 `trap EXIT` 而不縮小 find 範圍，步驟 3 失敗** | **`final/` 由 3 個變 0 個** |
+| E | find 範圍縮小到 `raw/` 與 `parsed/`（`-maxdepth 1`），同 D 條件 | `final/` 保留 3 個，`raw/` 舊檔仍正常清除 |
+
+結論：
+
+1. `final/` 檔案存活依賴「每次成功執行都重寫使 mtime 變新」，
+   不是被排除在刪除範圍外。任何讓 mtime 停止更新的情境
+   （zone 移除、更新長期停滯 + 失敗路徑清理）都會讓 `final/` 被刪。
+2. **Phase 1B 的順序因此固定：先縮小 find 範圍，才能加 `trap EXIT`。**
+   順序顛倒會在停滯設備上刪光 DataGroup 來源（測試 D）。
+3. 測試 E 即 Phase 1B 實際採用的修法。
