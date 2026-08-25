@@ -58,7 +58,7 @@ deterministic 一致。完整記錄 `process.md` 第 23 節。最新數字見上
 | `tests/lab/f5_e2e_1b_controlled.sh` | `84f57120eda3b1d19756a86f43670a98` | 173 | fail-closed 受控 e2e 驅動（20 斷言 + 5 拒絕 + 注入案例） |
 | `tests/check_source_consistency.sh` 第 9 節 | — | — | gate 擴充（PASS=31 FAIL=0） |
 | `docs/PHASE1B_DESIGN_20260823.md` | — | — | 設計文件（狀態已更新） |
-| `patches/README.md` 第 8 節 | — | — | 部署 SOP |
+| `patches/README.md` | — | — | 部署手冊（2026-08-23 為工程師可讀性全文改寫，內容等值） |
 
 patch SHA-256：
 `aa97950e8a45541b8f48bcdfa4d20c495db6d9ef4989724d064dd3470058c785`
@@ -147,4 +147,4 @@ DataGroup 未受影響（update 對 0 筆跳過）。已修復並以第二版 e2
 3. `patches/rpz_patch_phase1b_v1.sh`（受審本體；工具邏輯對照 v4）
 4. `tests/lab/f5_patch_1b_test.sh`、`tests/lab/f5_e2e_1b_controlled.sh`
 5. `process.md` 第 22~24 節（實作、事故、兩輪審核回應）
-6. `patches/README.md` 第 8 節（部署 SOP）
+6. `patches/README.md`（部署手冊）
