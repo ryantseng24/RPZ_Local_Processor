@@ -4,11 +4,15 @@
 **本版**: 2026-09-05（第一輪審核回應後更新）
 **第一輪判定**: 日誌修正 GO / canary CONDITIONAL GO / e2e 驅動器修正前 NO-GO
 （`CODE_REVIEW_PHASE1C_STE100_20260905.md`，SHA-256 `e1f0d694…`）。
-**P1C-01（SOP）、P1C-02（e2e）、P1C-03（文字）已全部修正並重驗**：
-mock 反向測試四模式全數中止、迴歸 PASS=33（新增 F4/F5 永久保護）、
-gate PASS=42、patch 重建 SHA-256 `a0ca535f…`（payload 三檔 md5 不變）。
-詳見 `process.md` 第 29 節。
-**請求**: 短確認 P1C-01~03 關閉。
+**第二輪判定**（`CODE_REVIEW_PHASE1C_ROUND2_STE100_20260905.md`）：
+production GO 維持；**P1C-02 關閉**（mock 五模式：normal 通過、
+interval3000/read_error/pgrep_error 三種錯誤中止、trap_save_error
+正常通過且 save 僅一次——第二次未驗證的 save 已不存在）；
+P1C-01 與 P1C-03 的殘項已依第二輪清單修正（README 4.6/§3/§5/§6、
+builder 註解、本文件與 STATUS 文字）。
+執行檔（patch `a0ca535f…`、e2e `43599109…`、regression `9dfb7290…`）
+本輪未改，hash 不變。
+**請求**: 文件核對，解除 canary 的文件條件。
 **判定格式**: GO / CONDITIONAL GO / NO-GO，findings 編號 P1C-xx。
 **前情**: v4 與 Phase 1B 均已審核 GO（`process.md` 第 19~25 節）。
 Phase 1C 是客戶 TAC 的新需求（09-03），獨立 patch，走既有流程。
@@ -29,13 +33,13 @@ F5 原生格式。remote 段客戶已自證（`TEST--2`）。
 
 | 檔案 | md5 | 行數 | 角色 |
 |---|---|---|---|
-| `patches/rpz_patch_phase1c_v1.sh` | 見 sidecar | 890 | patch 本體（內嵌 647 + 邏輯 243） |
+| `patches/rpz_patch_phase1c_v1.sh` | 見 sidecar | 892 | patch 本體（內嵌 647 + 邏輯 245） |
 | `patches/rpz_patch_phase1c_v1.sh.sha256` | — | 1 | sidecar |
 | `patches/build_patch_phase1c.sh` | — | 316 | builder（deterministic，已驗） |
 | `scripts/main.sh` | `9d8538a68480a1a0489058be6b1d6622` | 350 | payload（1B 版 -> 1C 版） |
 | `scripts/extract_rpz.sh` | `fea7c2e29f5380ab22611f7b2cc97fbc` | 85 | payload（v1.2 -> 1C 版） |
 | `scripts/update_datagroup.sh` | `67227cb39028dc2bf17b14ef9c871bc4` | 200 | payload（v1.2 -> 1C 版） |
-| `tests/lab/f5_patch_1c_test.sh` | — | 202 | 迴歸（33 斷言，含 F4 parsing 失敗、F5 logger 失敗永久保護） |
+| `tests/lab/f5_patch_1c_test.sh` | — | 205 | 迴歸（33 斷言，含 F4 parsing 失敗、F5 logger 失敗永久保護） |
 | `tests/lab/f5_e2e_1c_controlled.sh` | — | 132 | fail-closed e2e（15 斷言 + 4 拒絕 + P1C-02 修正與 mock 反向驗證） |
 | `tests/check_source_consistency.sh` 第 9~10 節 | — | — | gate 改鏈模型 + 1C 檢查（PASS=42） |
 
@@ -58,8 +62,9 @@ patch SHA-256：
 ## 4. payload 鏈設計（請重點審這裡）
 
 1. 1C 的「部署前版本」：main.sh = **1B 修正版**（`d1e1f688`）、
-   extract/update = v1.2 原版。check 以 md5 強制部署順序
-   v4 -> 1B -> 1C；未套 1B 的設備回報版本不明並拒絕。
+   extract/update = v1.2 原版。**1C 的 check 只驗自己的三檔**：
+   main.sh 綁 1B 版，所以未套 1B 的設備會拒絕；v4 不在檢查範圍，
+   由 SOP 交叉確認（README 4.6）。
 2. gate 改鏈模型：1B patch 內嵌對「1B 凍結版」驗證（tracked main.sh
    已前進到 1C 版）；鏈尾對 tracked source。1B 的 GO 資產未改動
    （SHA-256 `aa97950e…` 不變），其迴歸測試（112 斷言）不依賴

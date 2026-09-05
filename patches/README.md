@@ -17,7 +17,7 @@
 
 ## 1. 部署檔案
 
-要帶到設備的檔案有 4 個，都在 `patches/` 目錄：
+要帶到設備的檔案有 6 個，都在 `patches/` 目錄：
 
 | 檔案 | 用途 |
 |---|---|
@@ -53,19 +53,19 @@ a0ca535f84f744cb50dfbdbe84e9dec7362d398968dd53bd33ee9d2de04610ec  rpz_patch_phas
 
 ## 3. 部署前檢查（每台設備）
 
-1. 傳 4 個檔案到設備：
+1. 傳 6 個檔案到設備：
 
 ```bash
-scp rpz_patch_sigpipe_v4.sh rpz_patch_sigpipe_v4.sh.sha256 rpz_patch_phase1b_v1.sh rpz_patch_phase1b_v1.sh.sha256 admin@<設備IP>:/var/tmp/
+scp rpz_patch_sigpipe_v4.sh rpz_patch_sigpipe_v4.sh.sha256 rpz_patch_phase1b_v1.sh rpz_patch_phase1b_v1.sh.sha256 rpz_patch_phase1c_v1.sh rpz_patch_phase1c_v1.sh.sha256 admin@<設備IP>:/var/tmp/
 ```
 
 2. 登入設備。核對檔案完整性：
 
 ```bash
-cd /var/tmp && sha256sum -c rpz_patch_sigpipe_v4.sh.sha256 && sha256sum -c rpz_patch_phase1b_v1.sh.sha256
+cd /var/tmp && sha256sum -c rpz_patch_sigpipe_v4.sh.sha256 && sha256sum -c rpz_patch_phase1b_v1.sh.sha256 && sha256sum -c rpz_patch_phase1c_v1.sh.sha256
 ```
 
-兩行都必須顯示 `OK`。
+三行都必須顯示 `OK`，才可以繼續。
 
 3. 檢查目前的程式版本。這個步驟只讀取，不改任何檔案：
 
@@ -207,7 +207,7 @@ ls /config/snmp/rpz_datagroups/raw/ | wc -l
 Patch 3 的 check 只驗它自己的三個檔案（main / extract / update）。
 **它不會檢查 Patch 1 的三個檔案。** 所以部署前要先做交叉確認。
 
-1. 前置確認（兩條都必須是「已套用」）：
+1. 前置確認：
 
 ```bash
 bash /var/tmp/rpz_patch_sigpipe_v4.sh check
@@ -221,7 +221,20 @@ bash /var/tmp/rpz_patch_phase1c_v1.sh check
 Patch 3 的 check 必須顯示「全部是部署前版本」。
 Patch 3 顯示「版本不明」時停止回報（最常見原因：Patch 2 還沒套用）。
 
-2. 套用與確認：
+2. 停止排程並等待系統靜止（目的：套用期間避免排程執行；pgrep
+   防護只檢查當下，不能鎖定排程）：
+
+```bash
+tmsh modify sys icall handler periodic rpz_processor_handler status inactive
+```
+
+重複執行下面這條，直到沒有輸出：
+
+```bash
+pgrep -f "RPZ_Local_Processor/scripts"
+```
+
+3. 套用與確認：
 
 ```bash
 bash /var/tmp/rpz_patch_phase1c_v1.sh apply
@@ -234,25 +247,45 @@ bash /var/tmp/rpz_patch_phase1c_v1.sh check
 必須顯示「已套用 Phase 1C 修正」。**記下備份目錄路徑**
 （`/var/tmp/rpz_patch1c_backup_<時間>`）。
 
-3. 部署後驗證：用 Patch 1 check（RC=0）加 Patch 3 check（RC=0）。
+4. 恢復排程並存檔（**套用成功或失敗，這一步都必須做**）：
+
+```bash
+tmsh modify sys icall handler periodic rpz_processor_handler status active
+```
+
+```bash
+tmsh save sys config
+```
+
+```bash
+tmsh list sys icall handler periodic rpz_processor_handler status interval
+```
+
+必須顯示 `status active` 與 `interval 300`。
+
+5. 部署後驗證：用 Patch 1 check（RC=0）加 Patch 3 check（RC=0）。
    **此時 Patch 2 的 check 會回報「版本不明」（RC=2）——這是預期行為**：
    舊工具不認得 Phase 1C 版的 main.sh，不代表保留策略被移除。
 
-4. Splunk 驗證（canary 必做）：送一筆帶唯一識別碼的測試訊息，
-   在本機與 Splunk 兩邊比對。不要故意破壞客戶流程來製造錯誤訊息。
+6. Splunk 驗證（canary 必做）：先知會監控人員這是測試訊息。
+   用**同一個唯一識別碼**分別送 notice 與 err 各一筆，
+   在本機與 Splunk 兩邊比對。err 等級必須驗（客戶關心的
+   `RPZ parsing failed` 就是 err）。**不要**故意讓真實 RPZ 流程
+   失敗來製造錯誤訊息。
 
 ```bash
-logger -t RPZLocal -p local0.notice "RPZLocal canary test $(date +%Y%m%d%H%M%S)"
+TESTID=$(date +%Y%m%d%H%M%S); logger -t RPZLocal -p local0.notice "RPZLocal canary test notice ${TESTID}"; logger -t RPZLocal -p local0.err "RPZLocal canary test err ${TESTID}"; echo "TESTID=${TESTID}"
 ```
 
-本機確認：
+本機確認（應有 notice 與 err 各一筆）：
 
 ```bash
-grep "RPZLocal canary test" /var/log/ltm | tail -1
+grep "RPZLocal canary test" /var/log/ltm | tail -2
 ```
 
-Splunk 端由客戶以相同字串查詢。之後等待一次真實更新，
-確認 `RPZ processing completed` 事件同樣出現在兩邊。
+Splunk 端由客戶以同一個 TESTID 查詢，必須同時查到 notice 與
+err 兩筆。之後等待一次真實更新，確認 `RPZ processing completed`
+事件同樣出現在兩邊。
 
 ## 5. 還原步驟（需要時才執行）
 
@@ -265,6 +298,10 @@ bash /var/tmp/rpz_patch_phase1c_v1.sh rollback /var/tmp/rpz_patch1c_backup_<時�
 ```
 
 使用 Patch 3 的純部署前備份。還原後 Patch 1 與 Patch 2 的修正仍在。
+
+**還原前後的排程操作（兩種情境都適用）**：還原前先停止排程並等待
+靜止（指令與 4.6 第 2 步相同）；還原完成或失敗後，恢復排程並存檔
+（指令與 4.6 第 4 步相同）。
 
 **情境 B：全部還原。順序固定 Patch 3 -> Patch 2 -> Patch 1，不得跳過 Patch 3。**
 已套用 Patch 3 的設備直接執行 Patch 2 的 rollback 會被版本檢查拒絕——
@@ -280,7 +317,13 @@ bash /var/tmp/rpz_patch_sigpipe_v4.sh rollback /var/tmp/rpz_patch_backup_<時間
 
 規則：
 
-1. 每條還原指令結束會自動核對版本。結果必須回到「原版 v1.2」。
+1. 每條還原指令結束會自動核對版本，回到**該 patch 的部署前版本**。
+   注意：只還原 Patch 3（情境 A）後，main.sh 是 Phase 1B 修正版，
+   Patch 3 的 check 顯示「全部是部署前版本」——不是 v1.2 原版。
+   情境 B 走完三步後：Patch 1 與 Patch 2 的 check 顯示原版 v1.2
+   （RC=0）；**Patch 3 的 check 會顯示「版本不明」（RC=2）**——因為
+   它的部署前基準是 1B 版 main.sh，不認得 v1.2 原版。這是預期結果，
+   不需要重新套用任何 patch。
 2. 還原工具只接受部署時自動建立的原版備份。
    備份內容不符時，工具會拒絕動作。此時停止並回報。
 3. 還原後，系統回到部署前的行為，原本的問題會回來。
@@ -294,6 +337,8 @@ bash /var/tmp/rpz_patch_sigpipe_v4.sh rollback /var/tmp/rpz_patch_backup_<時間
 | 部署前 check 輸出（兩個 patch） | 附檔 |
 | Patch 1 備份目錄路徑 | |
 | Patch 2 備份目錄路徑 | |
+| Patch 3 備份目錄路徑 | |
+| Splunk 驗證 TESTID 與結果（notice + err） | |
 | 測試前 revision / size / final 檔案時間 | |
 | `main.sh RC` | |
 | 測試後 revision / size / final 檔案時間 | |
@@ -389,7 +434,8 @@ Phase 1C（2026-09-04）修正。Patch 2 的內嵌副本是凍結的歷史版本
 | `rpz_patch_phase1b_v1.sh` | **現行** Patch 2 |
 | `rpz_patch_phase1c_v1.sh` | Patch 3（事件 log 改走 syslog，**審核中，暫不部署**；部署順序將為 Patch 1 -> 2 -> 3） |
 
-patch 都以 builder 從 tracked source 產生：
-`patches/build_patch_v4.sh`、`patches/build_patch_phase1b.sh`、
-`patches/build_patch_phase1c.sh`。builder 只給開發端使用，
-不要帶到設備上。
+patch 都以 builder 產生。v4 與 Phase 1C 的 builder 對目前的
+tracked source 重建；**Phase 1B 的 builder 必須在歷史版本
+`f560b80` 的 checkout 重建**（tracked main.sh 已前進到 1C 版，
+1B builder 的 md5 檢查會正確拒絕目前版本——這是保護）。
+builder 只給開發端使用，不要帶到設備上。

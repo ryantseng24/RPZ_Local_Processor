@@ -8,7 +8,7 @@ OUT=$REPO/patches/rpz_patch_phase1c_v1.sh
 WORK=$(mktemp "${TMPDIR:-/tmp}/p1cbuild.XXXXXX")
 
 # ---- 部署前版本 md5（審核核定常數）----
-# main.sh 的部署前版本 = Phase 1B 修正版（強制部署順序 v4 -> 1B -> 1C）。
+# main.sh 的部署前版本 = Phase 1B 修正版（1C 只驗自己的三檔；v4 由 SOP 確認）。
 # extract/update 的部署前版本 = GitHub baseline v1.2。
 OM=d1e1f688d939a5a5e87282605d0e3eed
 OE=62aeaf053b08f3411fe530f33555c414

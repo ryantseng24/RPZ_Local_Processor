@@ -2074,3 +2074,34 @@ e2e 驅動器修正前 NO-GO。審核者獨立重驗 gate 42、迴歸 29、
 
 Splunk 收件驗證（README 4.6 節第 4 步，唯一識別碼比對）。
 完成前不宣稱需求端對端結案。
+
+---
+
+## 30. Phase 1C 第二輪短確認回應（2026-09-05）
+
+審核文件：`docs/reviews/CODE_REVIEW_PHASE1C_ROUND2_STE100_20260905.md`。
+判定：production GO 維持；**P1C-02 關閉**（審核者以第一輪 mock 重驗
+五模式：normal 通過、三種錯誤模式中止、trap_save_error 正常通過且
+save 僅執行一次）；e2e driver GO（限指定 LAB）；P1C-01/03 殘項列明。
+
+### 30.1 殘項修正（純文件，執行檔 hash 不變）
+
+| 項目 | 修正 |
+|---|---|
+| P1C-01 傳檔 | README 第 3 節改 6 檔 scp + 三個 sidecar 驗證（三行 OK 才繼續） |
+| P1C-01 排程 | 4.6 節加「停止排程 -> 等待靜止 -> 套用 -> 恢復並存檔（成敗都做）」；第 5 節還原前後同樣操作 |
+| P1C-01 預期輸出 | 刪除 4.6 的矛盾句（前置確認時 Patch 3 應為「部署前版本」）；第 5 節改正「回到原版 v1.2」——情境 A 後 main 是 1B 修正版，只有情境 B 走完三步才全回 v1.2 |
+| P1C-01 Splunk err | 4.6 改為同一 TESTID 分送 notice 與 err 各一筆、先知會監控人員、兩邊比對；記錄表加 Patch 3 備份路徑與 TESTID 欄位 |
+| P1C-03 | handoff 與 builder 註解改「1C 只驗自己三檔；v4 由 SOP 確認」；mock 結果措辭改「三種錯誤中止、trap_save_error 正常通過（save 僅一次）」；行數 892/245、regression 205、LAB README 33；主手冊補 1B builder 需以 `f560b80` 歷史版本重建 |
+
+驗證：patch 重建後 SHA-256 不變（builder 註解在產生模板之外）
+`a0ca535f…`；e2e `43599109…`、regression `9dfb7290…` 未動；
+gate PASS=42 FAIL=0。
+
+### 30.2 canary 條件狀態
+
+文件條件已依本輪清單完成；審核核對後只剩 README 第 5 節一句
+（全還原後 Patch 3 check 顯示「版本不明」屬預期）需更正，已於
+09-05 修正——**canary 文件條件解除**。
+Splunk 現場收件條件保留至 canary（README 4.6 第 6 步，
+同一 TESTID 的 notice + err 兩筆比對）。
