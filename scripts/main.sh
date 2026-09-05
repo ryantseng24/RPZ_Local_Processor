@@ -28,7 +28,6 @@ source "${SCRIPT_DIR}/utils.sh"
 CONFIG_DIR="${PROJECT_ROOT}/config"
 LOG_DIR="${PROJECT_ROOT}/logs"
 OUTPUT_DIR="${OUTPUT_DIR:-/config/snmp/rpz_datagroups}"
-LOG_FILE="${LOG_FILE:-/var/log/ltm}"
 
 # 是否清理臨時檔案 (預設: 是)
 CLEANUP_TEMP="${CLEANUP_TEMP:-true}"
@@ -57,7 +56,7 @@ init() {
     log_info "=========================================="
     log_info "專案根目錄: $PROJECT_ROOT"
     log_info "輸出目錄: $OUTPUT_DIR"
-    log_info "日誌檔案: $LOG_FILE"
+    log_info "系統事件 log: syslog local0 -> /var/log/ltm（tag=RPZLocal）"
 
     # 建立必要目錄
     ensure_dir "$LOG_DIR"
@@ -92,7 +91,7 @@ prune_family() {
     # 前綴以字面比對（引號展開），不作為 glob 使用：
     # alpha 家族不會選中 alpha_beta 家族的檔案（P1B-08）。
     # 檔名時間戳使 glob 展開的字典序即時間序。
-    # 純 bash 迴圈，不用管線（SIGPIPE 根因見 process.md 第 13 節）。
+    # 純 bash 迴圈，不用管線（SIGPIPE 根因見 process.md 第 2 節，實測數據第 6 節）。
     local dir="$1" prefix="$2" ext="$3" keep="$4"
     local files=() f i del
     for f in "$dir/${prefix}"_${TS_GLOB}"${ext}"; do
@@ -147,7 +146,7 @@ cleanup() {
     fi
 
     # 只清 raw/ 與 parsed/，不遞迴掃 OUTPUT_DIR。
-    # final/ 是 DataGroup 的 source-path，刪除即影響服務（實測見 process.md 第 15 節）。
+    # final/ 是 DataGroup 的 source-path，刪除即影響服務（實測見 process.md 第 27 節）。
     if [[ -d "$OUTPUT_DIR/raw" ]]; then
         if ! find "$OUTPUT_DIR/raw" -maxdepth 1 -type f -mtime +7 -delete 2>/dev/null; then
             log_warn "天數上限清理失敗（raw/ 有檔案無法刪除）"
@@ -193,7 +192,6 @@ on_exit() {
 
 main() {
     local start_time=$(date +%s)
-    local timestamp=$(timestamp)
 
     # 初始化
     init
@@ -214,18 +212,18 @@ main() {
         if [[ "$soa_check_output" == "NO_UPDATE" ]]; then
             # SOA 未變更，無需更新（這是正常情況，不是錯誤）
             log_info "SOA Serial 未變更，無需更新"
-            echo "$timestamp $(uname -n) INFO: RPZ SOA not changed, skip update" >> "$LOG_FILE"
+            logger -t RPZLocal -p local0.notice "RPZ SOA not changed, skip update" || true
             exit 0
         elif [[ "$soa_check_output" != "UPDATE_NEEDED" ]]; then
             # 檢查失敗或輸出異常
             log_error "SOA 檢查失敗或輸出異常（退出碼: $soa_check_exit, 輸出: '$soa_check_output'）"
-            echo "$timestamp $(uname -n) ERROR: RPZ SOA check failed" >> "$LOG_FILE"
+            logger -t RPZLocal -p local0.err "RPZ SOA check failed" || true
             exit 1
         fi
 
         # SOA 已變更，繼續處理
         log_info "SOA Serial 已變更，繼續處理"
-        echo "$timestamp $(uname -n) INFO: RPZ SOA changed, start processing" >> "$LOG_FILE"
+        logger -t RPZLocal -p local0.notice "RPZ SOA changed, start processing" || true
     fi
 
     # 步驟 2: 從 DNS Express 提取 RPZ 資料
@@ -233,7 +231,7 @@ main() {
     log_info "步驟 2/5: 提取 DNS Express 資料"
     if ! bash "${SCRIPT_DIR}/extract_rpz.sh"; then
         log_error "資料提取失敗"
-        echo "$timestamp $(uname -n) ERROR: RPZ extraction failed" >> "$LOG_FILE"
+        logger -t RPZLocal -p local0.err "RPZ extraction failed" || true
         exit 1
     fi
 
@@ -242,7 +240,7 @@ main() {
     log_info "步驟 3/5: 解析 RPZ 記錄"
     if ! bash "${SCRIPT_DIR}/parse_rpz.sh"; then
         log_error "RPZ 解析失敗"
-        echo "$timestamp $(uname -n) ERROR: RPZ parsing failed" >> "$LOG_FILE"
+        logger -t RPZLocal -p local0.err "RPZ parsing failed" || true
         exit 1
     fi
 
@@ -251,7 +249,7 @@ main() {
     log_info "步驟 4/5: 產生 DataGroup 檔案"
     if ! bash "${SCRIPT_DIR}/generate_datagroup.sh"; then
         log_error "DataGroup 產生失敗"
-        echo "$timestamp $(uname -n) ERROR: DataGroup generation failed" >> "$LOG_FILE"
+        logger -t RPZLocal -p local0.err "DataGroup generation failed" || true
         exit 1
     fi
 
@@ -260,7 +258,7 @@ main() {
     log_info "步驟 5/5: 更新 F5 DataGroups"
     if ! bash "${SCRIPT_DIR}/update_datagroup.sh"; then
         log_error "F5 DataGroup 更新失敗"
-        echo "$timestamp $(uname -n) ERROR: F5 update failed" >> "$LOG_FILE"
+        logger -t RPZLocal -p local0.err "F5 update failed" || true
         exit 1
     fi
 
@@ -276,7 +274,7 @@ main() {
     log_info "  處理完成"
     log_info "=========================================="
     log_info "總耗時: $(timer_format "$elapsed")"
-    echo "$timestamp $(uname -n) INFO: RPZ processing completed in ${elapsed}s" >> "$LOG_FILE"
+    logger -t RPZLocal -p local0.notice "RPZ processing completed in ${elapsed}s" || true
 
     exit 0
 }
@@ -303,7 +301,6 @@ show_usage() {
 
 環境變數:
   OUTPUT_DIR           DataGroup 輸出目錄 (預設: /config/snmp/rpz_datagroups)
-  LOG_FILE             日誌檔案位置 (預設: /var/log/ltm)
   DNSXDUMP_CMD         dnsxdump 指令路徑 (預設: /usr/local/bin/dnsxdump)
   LOG_LEVEL            日誌等級 0-3 (預設: 1=INFO)
   RPZ_KEEP_COUNT       暫存檔每家族保留數量上限 (預設: 24，範圍 1-99999)

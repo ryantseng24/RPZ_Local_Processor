@@ -16,7 +16,6 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 OUTPUT_DIR="${OUTPUT_DIR:-/config/snmp/rpz_datagroups}"
 RAW_DATA_DIR="${OUTPUT_DIR}/raw"
 DNSXDUMP_CMD="${DNSXDUMP_CMD:-/usr/local/bin/dnsxdump}"
-LOG_FILE="${LOG_FILE:-/var/log/ltm}"
 
 # =============================================================================
 # 執行 dnsxdump 並導出完整資料
@@ -24,34 +23,33 @@ LOG_FILE="${LOG_FILE:-/var/log/ltm}"
 
 execute_dnsxdump() {
     local output_file="$1"
-    local timestamp=$(timestamp)
 
     log_info "執行 dnsxdump 導出 DNS Express 資料"
 
     # 檢查指令是否存在
     if [[ ! -x "$DNSXDUMP_CMD" ]]; then
         log_error "dnsxdump 指令不存在或無執行權限: $DNSXDUMP_CMD"
-        echo "$timestamp ERROR: dnsxdump command not found" >> "$LOG_FILE" 2>/dev/null || true
+        logger -t RPZLocal -p local0.err "dnsxdump command not found" || true
         return 1
     fi
 
     # 執行 dnsxdump
     if ! "$DNSXDUMP_CMD" > "$output_file" 2>&1; then
         log_error "執行 dnsxdump 失敗"
-        echo "$timestamp ERROR: dnsxdump execution failed" >> "$LOG_FILE" 2>/dev/null || true
+        logger -t RPZLocal -p local0.err "dnsxdump execution failed" || true
         return 1
     fi
 
     # 檢查輸出檔案
     if [[ ! -s "$output_file" ]]; then
         log_error "dnsxdump 輸出檔案為空"
-        echo "$timestamp ERROR: dnsxdump output is empty" >> "$LOG_FILE" 2>/dev/null || true
+        logger -t RPZLocal -p local0.err "dnsxdump output is empty" || true
         return 1
     fi
 
     local line_count=$(wc -l < "$output_file")
     log_info "dnsxdump 執行成功，匯出 $line_count 行資料"
-    echo "$timestamp INFO: dnsxdump exported $line_count lines" >> "$LOG_FILE" 2>/dev/null || true
+    logger -t RPZLocal -p local0.notice "dnsxdump exported ${line_count} lines" || true
 
     return 0
 }

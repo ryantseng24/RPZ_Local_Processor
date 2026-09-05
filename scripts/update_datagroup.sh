@@ -20,7 +20,6 @@ source "${SCRIPT_DIR}/utils.sh"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 OUTPUT_DIR="${OUTPUT_DIR:-/config/snmp/rpz_datagroups}"
 FINAL_OUTPUT_DIR="${OUTPUT_DIR}/final"
-LOG_FILE="${LOG_FILE:-/var/log/ltm}"
 ZONELIST_FILE="${ZONELIST_FILE:-${PROJECT_ROOT}/config/zonelist.txt}"
 
 # =============================================================================
@@ -57,7 +56,6 @@ datagroup_exists() {
 create_datagroup() {
     local dg_name="$1"
     local source_file="$2"
-    local timestamp=$(timestamp)
 
     log_info "建立新的 DataGroup: $dg_name"
 
@@ -66,11 +64,11 @@ create_datagroup() {
         source-path "file:$source_file" \
         type string 2>&1; then
         log_info "✓ DataGroup $dg_name 建立成功"
-        echo "$timestamp $(uname -n) INFO: created DataGroup $dg_name (file=$source_file)" >> "$LOG_FILE"
+        logger -t RPZLocal -p local0.notice "created DataGroup ${dg_name} (file=${source_file})" || true
         return 0
     else
         log_error "DataGroup $dg_name 建立失敗"
-        echo "$timestamp $(uname -n) ERROR: failed to create DataGroup $dg_name" >> "$LOG_FILE"
+        logger -t RPZLocal -p local0.err "failed to create DataGroup ${dg_name}" || true
         return 1
     fi
 }
@@ -82,14 +80,13 @@ create_datagroup() {
 update_single_datagroup() {
     local dg_name="$1"
     local source_file="$2"
-    local timestamp=$(timestamp)
 
     log_info "處理 DataGroup: $dg_name"
 
     # 檢查檔案是否存在
     if [[ ! -f "$source_file" ]]; then
         log_error "來源檔案不存在: $source_file"
-        echo "$timestamp $(uname -n) ERROR: source file not found: $source_file" >> "$LOG_FILE"
+        logger -t RPZLocal -p local0.err "source file not found: ${source_file}" || true
         return 1
     fi
 
@@ -112,11 +109,11 @@ update_single_datagroup() {
     if tmsh modify ltm data-group external "$dg_name" source-path "file:$source_file" 2>&1; then
         local record_count=$(wc -l < "$source_file")
         log_info "✓ DataGroup $dg_name 更新成功 ($record_count 筆記錄)"
-        echo "$timestamp $(uname -n) INFO: updated DataGroup $dg_name ($record_count records, file=$source_file)" >> "$LOG_FILE"
+        logger -t RPZLocal -p local0.notice "updated DataGroup ${dg_name} (${record_count} records, file=${source_file})" || true
         return 0
     else
         log_error "DataGroup $dg_name 更新失敗"
-        echo "$timestamp $(uname -n) ERROR: failed to update DataGroup $dg_name" >> "$LOG_FILE"
+        logger -t RPZLocal -p local0.err "failed to update DataGroup ${dg_name}" || true
         return 1
     fi
 }
