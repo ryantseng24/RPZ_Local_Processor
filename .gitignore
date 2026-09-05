@@ -61,3 +61,6 @@ RPZ_手動清檔作業說明*.md
 
 # patch 的 SHA-256 sidecar 是審核要求的交付物，自 *.sha256 排除中還原
 !patches/*.sha256
+
+# 客戶郵件
+*.eml

@@ -14,7 +14,8 @@ cd "$SCRIPT_DIR"
 # 版本與時間戳
 # 1.2.1: 修正 ls|head 在 pipefail 下的 SIGPIPE 缺陷 (見 process.md 第 2 節)
 # 1.2.2: Phase 1B 暫存檔保留策略，只改 main.sh (見 process.md 第 22 節)
-VERSION="1.2.2"
+# 1.2.3: Phase 1C 事件 log 改走 syslog local0 (見 process.md 第 28 節)
+VERSION="1.2.3"
 TIMESTAMP=$(date '+%Y%m%d_%H%M%S')
 PACKAGE_NAME="rpz_local_processor_v${VERSION}_${TIMESTAMP}"
 OUTPUT_DIR="${SCRIPT_DIR}/dist"

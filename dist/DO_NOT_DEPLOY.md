@@ -21,6 +21,8 @@ Phase 1B 三輪審核對完整安裝包維持 **NO-GO**。逐 artifact 記錄：
 | `rpz_local_processor_v1.2.2_20260823_014255.tar.gz` | `783514f9…` | HOLD |
 | `rpz_local_processor_v1.2.2_20260823_071238.tar.gz` | `0db3e50f8c0df5e44f8133f7f605fe4dc2be6af17e0992aad04caf2084b510f2` | 審核輪 3 本機掃描未見 `LIBARCHIVE.xattr`/`SCHILY.xattr` 字串，但 **P1B-06 不因此關閉**——需在 F5 GNU tar 實際解壓驗證後才能重判。HOLD |
 
+| `rpz_local_processor_v1.2.3_20260904_120903.tar.gz` | `fe0aa51a8723205a…` | Phase 1C 內容重打（2026-09-04）。P1B-05/06 未解，HOLD |
+
 **P1B-05 仍然成立**：`install.sh` 的 `SUPPORTED_VERSIONS="1.2.1"`，
 任何 v1.2.2 包安裝必失敗。
 

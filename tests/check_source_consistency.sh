@@ -268,6 +268,9 @@ else
     bad "patches/ 有 $np1b 個 Phase 1B patch 腳本，應該只有一個"
 fi
 
+# payload 鏈: tracked main.sh 已前進到 Phase 1C 版，
+# 1B patch 的內嵌對「1B 凍結版」驗證，不對 tracked source。
+P1B_FROZEN_main=d1e1f688d939a5a5e87282605d0e3eed
 if [ -f "$P1B" ]; then
     tmp1b=$(mktemp -d)
     awk '
@@ -277,18 +280,17 @@ if [ -f "$P1B" ]; then
     ' "$P1B" > "$tmp1b/main.sh"
     if [ ! -s "$tmp1b/main.sh" ]; then
         bad "main.sh 無法從 Phase 1B patch 抽出嵌入內容"
-    elif [ "$(md5f "$tmp1b/main.sh")" = "$(md5f scripts/main.sh)" ]; then
-        ok "main.sh 嵌入內容一致"
+    elif [ "$(md5f "$tmp1b/main.sh")" = "$P1B_FROZEN_main" ]; then
+        ok "main.sh 嵌入內容 = 1B 凍結版"
     else
-        bad "main.sh 嵌入內容與 scripts/main.sh 不一致"
+        bad "main.sh 嵌入內容與 1B 凍結版不一致（應為 ${P1B_FROZEN_main}）"
     fi
     rm -rf "$tmp1b"
 
-    want_new_main=$(md5f scripts/main.sh)
-    if grep -qF "NEW[main.sh]=\"${want_new_main}\"" "$P1B"; then
-        ok "main.sh 的 NEW md5 相符"
+    if grep -qF "NEW[main.sh]=\"${P1B_FROZEN_main}\"" "$P1B"; then
+        ok "main.sh 的 NEW md5 = 1B 凍結版"
     else
-        bad "main.sh 的 NEW md5 與 scripts/main.sh 不符（應為 ${want_new_main}）"
+        bad "main.sh 的 NEW md5 不是 1B 凍結版（應為 ${P1B_FROZEN_main}）"
     fi
     if grep -qF "ORIG[main.sh]=\"${ORIG_main_sh}\"" "$P1B"; then
         ok "main.sh 的 ORIG md5 相符"
@@ -304,6 +306,60 @@ if [ -f "$P1B" ]; then
         fi
     else
         bad "找不到 ${P1B}.sha256"
+    fi
+fi
+
+# ---------------------------------------------------------------- 10
+echo "10. Phase 1C patch 一致性（payload 鏈尾，對 tracked source）"
+P1C=patches/rpz_patch_phase1c_v1.sh
+ORIG1C_main=d1e1f688d939a5a5e87282605d0e3eed
+ORIG1C_ext=62aeaf053b08f3411fe530f33555c414
+ORIG1C_upd=f8b038bc06df1c07050cd2922a91c5aa
+
+np1c=$(ls -1 patches/rpz_patch_phase1c_v*.sh 2>/dev/null | wc -l | tr -d ' ')
+if [ "$np1c" = 1 ] && [ -f "$P1C" ]; then
+    ok "只有一個 Phase 1C patch: $(basename "$P1C")"
+else
+    bad "patches/ 有 $np1c 個 Phase 1C patch 腳本，應該只有一個"
+fi
+
+if [ -f "$P1C" ]; then
+    tmp1c=$(mktemp -d)
+    i=0
+    for f in main.sh extract_rpz.sh update_datagroup.sh; do
+        i=$((i+1))
+        awk -v want="$i" '
+            /^cat <<'"'"'__RPZ_EMBED__'"'"'$/ { n++; inb=1; next }
+            /^__RPZ_EMBED__$/                { inb=0; next }
+            inb && n == want                 { print }
+        ' "$P1C" > "$tmp1c/$f"
+        if [ ! -s "$tmp1c/$f" ]; then
+            bad "$f 無法從 Phase 1C patch 抽出嵌入內容"
+        elif [ "$(md5f "$tmp1c/$f")" = "$(md5f "scripts/$f")" ]; then
+            ok "$f 嵌入內容與 tracked source 一致"
+        else
+            bad "$f 嵌入內容與 scripts/$f 不一致"
+        fi
+        want_new=$(md5f "scripts/$f")
+        if grep -qF "NEW[${f}]=\"${want_new}\"" "$P1C"; then
+            ok "$f 的 NEW md5 相符"
+        else
+            bad "$f 的 NEW md5 不符（應為 ${want_new}）"
+        fi
+    done
+    rm -rf "$tmp1c"
+    grep -qF "ORIG[main.sh]=\"${ORIG1C_main}\"" "$P1C" && ok "main.sh 的 ORIG = 1B 凍結版" || bad "main.sh 的 ORIG 應為 1B 凍結版 ${ORIG1C_main}"
+    grep -qF "ORIG[extract_rpz.sh]=\"${ORIG1C_ext}\"" "$P1C" && ok "extract_rpz.sh 的 ORIG = v1.2" || bad "extract_rpz.sh 的 ORIG 應為 ${ORIG1C_ext}"
+    grep -qF "ORIG[update_datagroup.sh]=\"${ORIG1C_upd}\"" "$P1C" && ok "update_datagroup.sh 的 ORIG = v1.2" || bad "update_datagroup.sh 的 ORIG 應為 ${ORIG1C_upd}"
+
+    if [ -f "${P1C}.sha256" ]; then
+        if ( cd "$(dirname "$P1C")" && sha256sum -c "$(basename "$P1C").sha256" >/dev/null 2>&1 ); then
+            ok "Phase 1C patch sidecar 驗證通過"
+        else
+            bad "Phase 1C patch sidecar 驗證失敗"
+        fi
+    else
+        bad "找不到 ${P1C}.sha256"
     fi
 fi
 

@@ -1971,3 +1971,106 @@ raw=24/parsed=72、dig 已無回應。LAB 回到乾淨狀態。
 2. **Phase 1B 的順序因此固定：先縮小 find 範圍，才能加 `trap EXIT`。**
    順序顛倒會在停滯設備上刪光 DataGroup 來源（測試 D）。
 3. 測試 E 即 Phase 1B 實際採用的修法。
+
+---
+
+## 28. Phase 1C：系統事件 log 改走 syslog（2026-09-04）
+
+### 28.1 需求與診斷
+
+客戶 TAC 需求（09-03 經經銷商轉達，.eml 存於本地）：腳本事件 log
+（含 `RPZ parsing failed`）在 Splunk（remote syslog）看不到。診斷：
+三支腳本共 **17 處**以 `echo >> /var/log/ltm` 檔案直寫（main.sh 8、
+extract_rpz.sh 4、update_datagroup.sh 5），繞過 syslog-ng，因此
+remote 轉送不到。本次事件期間 Splunk 上完全看不到失敗——此需求
+直接補上監控盲點。
+
+LAB 實測（17.1.3.1）：`logger -t RPZLocal -p local0.notice|err|info`
+三個等級都落入 `/var/log/ltm`，格式為 F5 原生
+（`Sep 4 12:02:28 主機 notice RPZLocal[pid]: 訊息`）。remote 轉送段
+LAB 無 Splunk 可驗，客戶已以 `logger -p local0.notice "TEST--2"` 自證。
+
+### 28.2 變更內容
+
+1. 17 處直寫改為 `logger -t RPZLocal -p local0.err|notice "訊息" || true`。
+   訊息文字不變；移除自帶的時間戳與主機名（syslog 會加原生格式）。
+   severity：失敗類 `err`（11 處）、事件類 `notice`（6 處）。
+2. 移除三支腳本中失效的 `LOG_FILE` 變數（3 處）與只為直寫服務的
+   `local timestamp` 宣告（4 處；update 內兩個函式各一）；main.sh 的
+   usage 同步。
+3. 一併修正 main.sh 兩處註解章節號勘誤（第 13 節 -> 第 2 節、
+   第 15 節 -> 第 27 節；`patches/README.md` 勘誤節等的就是這次）。
+4. `extract_rpz.sh` 補結尾 newline（v1.2 同型問題第三例，builder
+   heredoc 需要）。
+
+新 md5：main.sh `9d8538a6…`（350 行）、extract_rpz.sh `fea7c2e2…`
+（85 行）、update_datagroup.sh `67227cb3…`（200 行）。
+
+### 28.3 patch 與 payload 鏈
+
+`patches/rpz_patch_phase1c_v1.sh`：890 行（內嵌 647 + 邏輯 243），
+SHA-256 `9e0eca91b481ff20ab822deb5c741696581ce508a184de6b896d19a4168390bd`，
+deterministic。**部署前版本 = 1B 版 main.sh（`d1e1f688`）+ v1.2 版
+extract/update**——check 以此強制部署順序 v4 -> 1B -> 1C，未套 1B 的
+設備會回報版本不明。工具邏輯與 v4/1B 同款（含純部署前版本 rollback
+gate 與目前檔案預檢）。
+
+gate 改為 **payload 鏈模型**：1B patch 的內嵌對「1B 凍結版」驗證，
+鏈尾（1C 的三檔、v4 的三檔）對 tracked source。新增第 10 節驗 1C。
+gate **PASS=42 FAIL=0**。package 升 1.2.3 重打（維持 HOLD）。
+
+### 28.4 LAB 驗證（license 到期前完成）
+
+1. 迴歸 `tests/lab/f5_patch_1c_test.sh`：**PASS=29 FAIL=0**。
+   M1-M8 機制（check/apply/冪等/版本不明/rollback/混合備份拒絕/
+   缺檔拒絕/chattr 注入與續跑）；F1-F3 功能（NO_UPDATE 的 notice
+   事件、失敗路徑的兩個 err 事件、無重複前綴、零直寫殘留）——
+   以 ltm 行數基準比對新增行。
+2. 受控 e2e `tests/lab/f5_e2e_1c_controlled.sh`（同款四道身分防護，
+   3 拒絕案例全 RC=2 + 本機錯誤主機名 RC=2）：**PASS=15 FAIL=0**。
+   apply/check gate、真實資料 `--force`、ltm 出現 extract/update/
+   completed 三類 notice 事件（原生格式、無重複前綴）、
+   revision 34 -> 35、raw 保留策略仍有效、handler 恢復 active/300、
+   save 成功。
+3. rollback e2e：還原至部署前版本（1B main + v1.2 其餘）-> 再 apply，
+   全 RC=0；v4 與 1C 兩條 check 鏈同時 RC=0。
+
+### 28.5 狀態與後續
+
+Phase 1C **待送 Codex 審核**（`docs/reviews/REVIEW_HANDOFF_PHASE1C.md`）。
+審核通過後：更新客戶 SOP（部署順序 v4 -> 1B -> 1C）與回覆經銷商。
+LAB license 經 09-05 查詢實際到期日為 2026/10/06（先前「隔日到期」為口頭資訊，以查詢為準）。
+
+
+---
+
+## 29. Phase 1C 第一輪審核回應（2026-09-05）
+
+審核文件：`docs/reviews/CODE_REVIEW_PHASE1C_STE100_20260905.md`
+（SHA-256 `e1f0d694…`）。判定：日誌修正本身 **GO**、canary CONDITIONAL GO、
+e2e 驅動器修正前 NO-GO。審核者獨立重驗 gate 42、迴歸 29、
+補充隔離檢查 46 項全過，並確認 payload 三檔 hash 與 LAB 安裝一致。
+
+### 29.1 findings 核實與修正
+
+| 編號 | 核實 | 修正 |
+|---|---|---|
+| P1C-01（Medium）SOP 未涵蓋跨 patch 版本關係 | 屬實：1C check 只驗自己三檔，不讀 v4；已裝 1C 後 1B check 回 RC=2（舊工具不認得新 main，屬保護）；舊還原順序寫法不適用已裝 1C 的設備 | `patches/README.md` 新增 4.6 節（Patch 3 部署：v4+1C 交叉確認、部署後 1B check RC=2 屬預期、Splunk 唯一識別碼驗證法）；第 5 節還原改寫（情境 A 只回復 1C；情境 B 全還原 1C -> 1B -> v4 不得跳過）；builder/patch 註解改為準確描述 check 範圍 |
+| P1C-02（Medium）e2e 四種錯誤條件仍回報 PASS | 屬實（審核者以本機 mock 證實） | 驅動器四項修正：tmsh 查詢保存 RC、status/interval 改 awk 精確欄位比對（3000 不再過 300）、pgrep rc 語意（1=無程序、>=2=查詢失敗即中止）、成功且核對後 `trap - EXIT`（不再有未驗證的第二次 save）。以審核者的 mock 重跑五模式：normal RC=0；interval3000 與 read_error RC=2、pgrep_error RC=1 全部中止；trap_save_error 下 save 僅執行 1 次 |
+| P1C-03（Low）文字與檔案不一致 | 屬實 | err 11/notice 6、timestamp ×4、builder 316 行、e2e 132 行（修正後值）、license 以 09-05 查詢的 2026/10/06 為準、1B builder 歷史重建需 checkout `f560b80`、patch 註解 Splunk 措辭改「本機已驗證，遠端待現場確認」、dist HOLD 補 v1.2.3 |
+
+### 29.2 重驗與產出
+
+1. patch 因註解修正重建：SHA-256
+   `a0ca535f84f744cb50dfbdbe84e9dec7362d398968dd53bd33ee9d2de04610ec`
+   （892 行；payload 三檔 md5 不變：`9d8538a6/fea7c2e2/67227cb3`）。
+   deterministic、sidecar、gate PASS=42 全過。
+2. 迴歸新增 F4（parsing 失敗事件）與 F5（logger 失敗不影響主流程）
+   永久保護：LAB **PASS=33 FAIL=0**。
+3. 依審核 6.6：未重跑 destructive e2e 與 soak；mock 反向測試已重跑。
+4. `.gitignore` 新增 `*.eml`（客戶郵件不入 repo，審核 6.8）。
+
+### 29.3 尚待現場（canary）
+
+Splunk 收件驗證（README 4.6 節第 4 步，唯一識別碼比對）。
+完成前不宣稱需求端對端結案。

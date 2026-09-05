@@ -25,12 +25,15 @@
 | `patches/rpz_patch_sigpipe_v4.sh.sha256` | Patch 1 檢查碼 |
 | `patches/rpz_patch_phase1b_v1.sh` | Patch 2 本體（暫存檔保留策略） |
 | `patches/rpz_patch_phase1b_v1.sh.sha256` | Patch 2 檢查碼 |
+| `patches/rpz_patch_phase1c_v1.sh` | Patch 3 本體（事件 log 改走 syslog；**審核短確認完成前暫不部署**） |
+| `patches/rpz_patch_phase1c_v1.sh.sha256` | Patch 3 檢查碼 |
 
 正確的 SHA-256 值：
 
 ```
 e407d6e7d0d12d1c6ca445d737208ab139437fd8504fe47d9b318754c1d37626  rpz_patch_sigpipe_v4.sh
 aa97950e8a45541b8f48bcdfa4d20c495db6d9ef4989724d064dd3470058c785  rpz_patch_phase1b_v1.sh
+a0ca535f84f744cb50dfbdbe84e9dec7362d398968dd53bd33ee9d2de04610ec  rpz_patch_phase1c_v1.sh
 ```
 
 規則：
@@ -43,7 +46,7 @@ aa97950e8a45541b8f48bcdfa4d20c495db6d9ef4989724d064dd3470058c785  rpz_patch_phas
 
 1. 先部署一台（試行台）。試行台完整通過第 4.6 節的驗收，才部署下一台。
 2. 不要多台同時部署。
-3. 每台的順序固定：先 Patch 1，後 Patch 2。
+3. 每台的順序固定：Patch 1 -> Patch 2 -> Patch 3。不得跳序。
 4. 如果任何步驟的輸出與本文件不符：停止、保留完整畫面輸出、回報。
    不要強行繼續。
 5. 部署期間不需要停用 DNS 服務。
@@ -199,10 +202,73 @@ ls /config/snmp/rpz_datagroups/raw/ | wc -l
 
 5. 試行台觀察一個工作日。無異常後，依本文件部署其餘設備。
 
+### 4.6 套用 Patch 3（事件 log 改走 syslog）
+
+Patch 3 的 check 只驗它自己的三個檔案（main / extract / update）。
+**它不會檢查 Patch 1 的三個檔案。** 所以部署前要先做交叉確認。
+
+1. 前置確認（兩條都必須是「已套用」）：
+
+```bash
+bash /var/tmp/rpz_patch_sigpipe_v4.sh check
+```
+
+```bash
+bash /var/tmp/rpz_patch_phase1c_v1.sh check
+```
+
+判讀：Patch 1 的 check 必須顯示「已全部套用修正」；
+Patch 3 的 check 必須顯示「全部是部署前版本」。
+Patch 3 顯示「版本不明」時停止回報（最常見原因：Patch 2 還沒套用）。
+
+2. 套用與確認：
+
+```bash
+bash /var/tmp/rpz_patch_phase1c_v1.sh apply
+```
+
+```bash
+bash /var/tmp/rpz_patch_phase1c_v1.sh check
+```
+
+必須顯示「已套用 Phase 1C 修正」。**記下備份目錄路徑**
+（`/var/tmp/rpz_patch1c_backup_<時間>`）。
+
+3. 部署後驗證：用 Patch 1 check（RC=0）加 Patch 3 check（RC=0）。
+   **此時 Patch 2 的 check 會回報「版本不明」（RC=2）——這是預期行為**：
+   舊工具不認得 Phase 1C 版的 main.sh，不代表保留策略被移除。
+
+4. Splunk 驗證（canary 必做）：送一筆帶唯一識別碼的測試訊息，
+   在本機與 Splunk 兩邊比對。不要故意破壞客戶流程來製造錯誤訊息。
+
+```bash
+logger -t RPZLocal -p local0.notice "RPZLocal canary test $(date +%Y%m%d%H%M%S)"
+```
+
+本機確認：
+
+```bash
+grep "RPZLocal canary test" /var/log/ltm | tail -1
+```
+
+Splunk 端由客戶以相同字串查詢。之後等待一次真實更新，
+確認 `RPZ processing completed` 事件同樣出現在兩邊。
+
 ## 5. 還原步驟（需要時才執行）
 
-還原順序與部署相反：先還原 Patch 2，再還原 Patch 1。
-備份目錄路徑，用第 4.1 與 4.2 節記下的值。
+兩種情境。備份目錄路徑用第 4.1、4.2、4.6 節記下的值。
+
+**情境 A：只回復 Patch 3（保留 Patch 1 與 Patch 2）**
+
+```bash
+bash /var/tmp/rpz_patch_phase1c_v1.sh rollback /var/tmp/rpz_patch1c_backup_<時間>
+```
+
+使用 Patch 3 的純部署前備份。還原後 Patch 1 與 Patch 2 的修正仍在。
+
+**情境 B：全部還原。順序固定 Patch 3 -> Patch 2 -> Patch 1，不得跳過 Patch 3。**
+已套用 Patch 3 的設備直接執行 Patch 2 的 rollback 會被版本檢查拒絕——
+這是保護，不是故障。先做情境 A，再照下面順序：
 
 ```bash
 bash /var/tmp/rpz_patch_phase1b_v1.sh rollback /var/tmp/rpz_patch1b_backup_<時間>
@@ -305,14 +371,13 @@ Patch 2 更換 1 個程式檔案（`main.sh`）。變更三項：
 
 完整審核往返記錄在 `process.md` 第 16～25 節與 `docs/reviews/`。
 
-### 10.4 已知勘誤（不影響行為）
+### 10.4 勘誤記錄（已於 Phase 1C 修正）
 
-`main.sh` 與兩個 patch 內嵌副本的註解，有兩處引用了錯誤的
-`process.md` 章節號：「第 13 節」應為第 2 節；「第 15 節」應為
-第 27 節。只是註解，不影響任何行為。修改會變更已交付的 patch
-SHA-256，因此保留到下一次程式變更時一併修正。
-`docs/PHASE1B_DESIGN_20260823.md` 第 3 節的程式碼樣本與實作
-逐字一致，保留同樣的筆誤。
+`main.sh` 曾有兩處註解引用錯誤的 `process.md` 章節號（「第 13 節」
+應為第 2 節；「第 15 節」應為第 27 節）。tracked source 已於
+Phase 1C（2026-09-04）修正。Patch 2 的內嵌副本是凍結的歷史版本，
+仍含舊註解；`docs/PHASE1B_DESIGN_20260823.md` 的程式碼樣本與該
+凍結版逐字一致，同樣保留。兩者皆不影響行為。
 
 ### 10.5 版本沿革
 
@@ -322,7 +387,9 @@ SHA-256，因此保留到下一次程式變更時一併修正。
 | patch v3 | 封存於 `patches/archive/`，只作審核紀錄，不要使用 |
 | `rpz_patch_sigpipe_v4.sh` | **現行** Patch 1 |
 | `rpz_patch_phase1b_v1.sh` | **現行** Patch 2 |
+| `rpz_patch_phase1c_v1.sh` | Patch 3（事件 log 改走 syslog，**審核中，暫不部署**；部署順序將為 Patch 1 -> 2 -> 3） |
 
-兩個 patch 都以 builder 從 tracked source 產生：
-`patches/build_patch_v4.sh`、`patches/build_patch_phase1b.sh`。
-builder 只給開發端使用，不要帶到設備上。
+patch 都以 builder 從 tracked source 產生：
+`patches/build_patch_v4.sh`、`patches/build_patch_phase1b.sh`、
+`patches/build_patch_phase1c.sh`。builder 只給開發端使用，
+不要帶到設備上。

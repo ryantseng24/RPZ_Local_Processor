@@ -11,6 +11,8 @@
 | **`f5_manual_cleanup_test.sh`** | **高** | **會刪除 `OUTPUT_DIR/raw`、`OUTPUT_DIR/parsed` 的檔案並執行 `main.sh --force`** |
 | `f5_patch_v4_test.sh` | 低 | v4 patch 工具迴歸（78 斷言）。fixture 在 `/var/tmp/rpz_v4_test`，以 sed 副本改指 fixture，不碰 `/config` |
 | `f5_patch_1b_test.sh` | 低 | Phase 1B 迴歸（112 斷言）。fixture 在 `/var/tmp/rpz_1b_test`；用 chattr +i 做故障注入，trap 會解除 |
+| `f5_patch_1c_test.sh` | 低（會在 LAB 的真實 ltm 產生少量 RPZLocal 測試行） | Phase 1C 迴歸（29 斷言）。fixture 在 `/var/tmp/rpz_1c_test` |
+| **`f5_e2e_1c_controlled.sh`** | **高** | **與 1b 版同款四道防護；套 1C、真實資料執行、驗證 syslog 事件與 revision** |
 | **`f5_e2e_1b_controlled.sh`** | **高** | **寫真實 `rpz_datagroups`、停/啟 handler、套 patch、`tmsh save sys config`。四道硬性防護：`--lab-only`、主機名必須 `cdns.ryantseng.work`（用 `uname -n`，無 bypass）、`E2E_CONFIRM` 完整確認字串、handler 初始必須 active/300。合成檔記錄於 manifest，只刪 manifest 內的檔案** |
 
 ## f5_manual_cleanup_test.sh 的執行條件
