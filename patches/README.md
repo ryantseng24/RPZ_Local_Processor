@@ -25,7 +25,7 @@
 | `patches/rpz_patch_sigpipe_v4.sh.sha256` | Patch 1 檢查碼 |
 | `patches/rpz_patch_phase1b_v1.sh` | Patch 2 本體（暫存檔保留策略） |
 | `patches/rpz_patch_phase1b_v1.sh.sha256` | Patch 2 檢查碼 |
-| `patches/rpz_patch_phase1c_v1.sh` | Patch 3 本體（事件 log 改走 syslog；**審核短確認完成前暫不部署**） |
+| `patches/rpz_patch_phase1c_v1.sh` | Patch 3 本體（事件 log 改走 syslog） |
 | `patches/rpz_patch_phase1c_v1.sh.sha256` | Patch 3 檢查碼 |
 
 正確的 SHA-256 值：
@@ -432,7 +432,7 @@ Phase 1C（2026-09-04）修正。Patch 2 的內嵌副本是凍結的歷史版本
 | patch v3 | 封存於 `patches/archive/`，只作審核紀錄，不要使用 |
 | `rpz_patch_sigpipe_v4.sh` | **現行** Patch 1 |
 | `rpz_patch_phase1b_v1.sh` | **現行** Patch 2 |
-| `rpz_patch_phase1c_v1.sh` | Patch 3（事件 log 改走 syslog，**審核中，暫不部署**；部署順序將為 Patch 1 -> 2 -> 3） |
+| `rpz_patch_phase1c_v1.sh` | **現行** Patch 3（事件 log 改走 syslog）。兩輪審核 GO，canary 文件條件已解除；部署順序 Patch 1 -> 2 -> 3，Splunk 收件於 canary 現場驗收 |
 
 patch 都以 builder 產生。v4 與 Phase 1C 的 builder 對目前的
 tracked source 重建；**Phase 1B 的 builder 必須在歷史版本
