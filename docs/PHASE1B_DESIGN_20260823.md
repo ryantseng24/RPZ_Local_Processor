@@ -224,8 +224,8 @@ on_exit() {
 
 | 項目 | 值 |
 |---|---|
-| patch 檔 | `patches/rpz_patch_phase1b_v1.sh`（單檔自足，內嵌完整新版 `main.sh`） |
-| builder | `patches/build_patch_phase1b.sh`（deterministic，GitHub baseline 常數） |
+| patch 檔 | `patches/patch2_retention/rpz_patch_phase1b_v1.sh`（單檔自足，內嵌完整新版 `main.sh`） |
+| builder | `patches/patch2_retention/build_patch_phase1b.sh`（deterministic，GitHub baseline 常數） |
 | 子指令 | `check` / `apply` / `rollback <備份目錄>`，退出碼 0/1/2 |
 | 原版 md5 | `main.sh` = `0041c1d74e5b8514dea506608607b8c6`（GitHub baseline `27415940`；每台先 check，同 R2-V4-03 紀律） |
 | 安全機制 | 與 v4 相同：md5 整批核對、pgrep guard、備份 + md5sums、同目錄 mktemp+mv、`--reference` 權限沿用、安裝後驗證、rollback 純原版 gate + 目前檔案預檢 |

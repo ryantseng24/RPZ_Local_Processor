@@ -2105,3 +2105,52 @@ gate PASS=42 FAIL=0。
 09-05 修正——**canary 文件條件解除**。
 Splunk 現場收件條件保留至 canary（README 4.6 第 6 步，
 同一 TESTID 的 notice + err 兩筆比對）。
+
+---
+
+## 31. patches/ 目錄重整（2026-09-08）
+
+使用者要求：patches/ 下分三個資料夾整理三個 patch，各自有 README，
+patches/ 根目錄放總表。
+
+### 31.1 新結構
+
+| 位置 | 內容 |
+|---|---|
+| `patches/README.md` | 總表：patch 清單、共同規則、傳檔、跨 patch 還原、記錄表、退出碼、常見狀況、背景 |
+| `patches/patch1_sigpipe/` | Patch 1 本體 + sidecar + `build_patch_v4.sh` + `README.md` |
+| `patches/patch2_retention/` | Patch 2 本體 + sidecar + `build_patch_phase1b.sh` + `README.md` |
+| `patches/patch3_syslog/` | Patch 3 本體 + sidecar + `build_patch_phase1c.sh` + `README.md` |
+| `patches/archive/` | 不變（v3 封存） |
+
+原單一 README（441 行）拆成 4 份。總表保留共同規則與跨 patch 事項；
+各 patch 的部署、驗證、還原步驟移入各自資料夾的 README。
+內容沿用審核通過的措辭，操作步驟本身沒有變更。
+
+### 31.2 隨路徑修改的檔案
+
+| 檔案 | 變更 |
+|---|---|
+| `tests/check_source_consistency.sh` | PATCH/P1B/P1C 常數、語法檢查 glob 改 `patches/*/*.sh`、5b/9/10 的唯一性檢查 glob |
+| 三個 `build_patch_*.sh` | REPO 解析改 `../..`、OUT 改新資料夾 |
+| `.gitignore` | `!patches/*.sha256` 改 `!patches/**/*.sha256` |
+| `STATUS_20260822.md` | 路徑與文件表 |
+| `dist/DO_NOT_DEPLOY.md` | 升級指引改為三個 patch 的新路徑 |
+| `docs/PHASE1B_DESIGN_20260823.md` | 交付物表的兩個路徑 |
+
+三個 patch 本體與 sidecar 只搬移，內容不變，SHA-256 不變。
+客戶 SOP 與 LAB 測試不受影響：SOP 只用檔名（basename），
+測試只用 `/var/tmp/` 路徑。歷史紀錄（本文件既有章節、`docs/reviews/`）
+內的舊路徑不回改。
+
+### 31.3 驗證（全部實際執行）
+
+| 項目 | 結果 |
+|---|---|
+| `bash -n`（gate 與三個 builder） | 通過 |
+| project gate | PASS=42 FAIL=0 RC=0 |
+| sidecar 驗證（三個新位置） | 三個 OK |
+| 隔離重建 v4 / 1C，與交付檔比對 | SHA-256 完全一致（`e407d6e7…` / `a0ca535f…`） |
+| 1B builder | 未重建。維持既有規則：須在 `f560b80` 的 checkout 重建 |
+| gitignore | 三個新 sidecar 路徑未被排除 |
+| 舊路徑殘留掃描 | 除歷史紀錄外無殘留 |

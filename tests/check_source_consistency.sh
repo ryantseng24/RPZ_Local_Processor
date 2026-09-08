@@ -17,9 +17,9 @@ ok()  { PASS=$((PASS+1)); printf '  [PASS] %s\n' "$*"; }
 bad() { FAIL=$((FAIL+1)); printf '  [FAIL] %s\n' "$*"; }
 
 FIXED="utils.sh parse_rpz.sh generate_datagroup.sh"
-# 現行 patch。patches/ 底下只應該有這一個 patch 腳本。
+# 現行 patch。patches/patch1_sigpipe/ 底下只應該有這一個 patch 腳本。
 # 舊版（v3）保留在 patches/archive/ 作審核紀錄，不算現行 patch（V4-04）。
-PATCH=patches/rpz_patch_sigpipe_v4.sh
+PATCH=patches/patch1_sigpipe/rpz_patch_sigpipe_v4.sh
 
 # 原版 v1.2 的 md5（歷史基準，用來確認 patch 的 MD5_ORIG 表沒有被誤改）
 ORIG_utils_sh=3cab6cbca952f3780350e9882e5f7c11
@@ -44,7 +44,7 @@ fi
 # ---------------------------------------------------------------- 2
 echo "2. 所有 shell script 語法檢查"
 n=0; e=0
-for f in scripts/*.sh config/*.sh install.sh cleanup.sh package.sh patches/*.sh patches/archive/*.sh tests/*.sh tests/lab/*.sh; do
+for f in scripts/*.sh config/*.sh install.sh cleanup.sh package.sh patches/*/*.sh tests/*.sh tests/lab/*.sh; do
     [ -f "$f" ] || continue
     n=$((n+1))
     bash -n "$f" 2>/dev/null || { bad "語法錯誤: $f"; e=$((e+1)); }
@@ -111,13 +111,13 @@ if [ -f "$PATCH" ]; then
 fi
 
 # ---------------------------------------------------------------- 5b
-echo "5b. patches/ 只有一個現行 patch 腳本"
-np=$(ls -1 patches/rpz_patch_sigpipe_v*.sh 2>/dev/null | wc -l | tr -d ' ')
+echo "5b. patches/patch1_sigpipe/ 只有一個現行 patch 腳本"
+np=$(ls -1 patches/patch1_sigpipe/rpz_patch_sigpipe_v*.sh 2>/dev/null | wc -l | tr -d ' ')
 if [ "$np" = 1 ] && [ -f "$PATCH" ]; then
     ok "只有 $(basename "$PATCH")"
 else
-    bad "patches/ 有 $np 個 patch 腳本，應該只保留現行版本"
-    ls -1 patches/rpz_patch_sigpipe_v*.sh 2>/dev/null | sed 's/^/       /'
+    bad "patches/patch1_sigpipe/ 有 $np 個 patch 腳本，應該只保留現行版本"
+    ls -1 patches/patch1_sigpipe/rpz_patch_sigpipe_v*.sh 2>/dev/null | sed 's/^/       /'
 fi
 
 # ---------------------------------------------------------------- 5c
@@ -258,14 +258,14 @@ fi
 
 # ---------------------------------------------------------------- 9
 echo "9. Phase 1B patch 一致性"
-P1B=patches/rpz_patch_phase1b_v1.sh
+P1B=patches/patch2_retention/rpz_patch_phase1b_v1.sh
 ORIG_main_sh=0041c1d74e5b8514dea506608607b8c6
 
-np1b=$(ls -1 patches/rpz_patch_phase1b_v*.sh 2>/dev/null | wc -l | tr -d ' ')
+np1b=$(ls -1 patches/patch2_retention/rpz_patch_phase1b_v*.sh 2>/dev/null | wc -l | tr -d ' ')
 if [ "$np1b" = 1 ] && [ -f "$P1B" ]; then
     ok "只有一個 Phase 1B patch: $(basename "$P1B")"
 else
-    bad "patches/ 有 $np1b 個 Phase 1B patch 腳本，應該只有一個"
+    bad "patches/patch2_retention/ 有 $np1b 個 Phase 1B patch 腳本，應該只有一個"
 fi
 
 # payload 鏈: tracked main.sh 已前進到 Phase 1C 版，
@@ -311,16 +311,16 @@ fi
 
 # ---------------------------------------------------------------- 10
 echo "10. Phase 1C patch 一致性（payload 鏈尾，對 tracked source）"
-P1C=patches/rpz_patch_phase1c_v1.sh
+P1C=patches/patch3_syslog/rpz_patch_phase1c_v1.sh
 ORIG1C_main=d1e1f688d939a5a5e87282605d0e3eed
 ORIG1C_ext=62aeaf053b08f3411fe530f33555c414
 ORIG1C_upd=f8b038bc06df1c07050cd2922a91c5aa
 
-np1c=$(ls -1 patches/rpz_patch_phase1c_v*.sh 2>/dev/null | wc -l | tr -d ' ')
+np1c=$(ls -1 patches/patch3_syslog/rpz_patch_phase1c_v*.sh 2>/dev/null | wc -l | tr -d ' ')
 if [ "$np1c" = 1 ] && [ -f "$P1C" ]; then
     ok "只有一個 Phase 1C patch: $(basename "$P1C")"
 else
-    bad "patches/ 有 $np1c 個 Phase 1C patch 腳本，應該只有一個"
+    bad "patches/patch3_syslog/ 有 $np1c 個 Phase 1C patch 腳本，應該只有一個"
 fi
 
 if [ -f "$P1C" ]; then

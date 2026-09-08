@@ -1,11 +1,11 @@
 #!/bin/bash
 # build_patch_v4.sh — 從 tracked source 組出 rpz_patch_sigpipe_v4.sh
-# 在 macOS 上執行。產出物在 repo 的 patches/ 下。
+# 在 macOS 上執行。產出物在 repo 的 patches/patch1_sigpipe/ 下。
 set -euo pipefail
 
-REPO=$(cd "$(dirname "$0")/.." && pwd)
+REPO=$(cd "$(dirname "$0")/../.." && pwd)
 SRC=$REPO/scripts
-OUT=$REPO/patches/rpz_patch_sigpipe_v4.sh
+OUT=$REPO/patches/patch1_sigpipe/rpz_patch_sigpipe_v4.sh
 WORK=$(mktemp "${TMPDIR:-/tmp}/v4build.XXXXXX")
 
 # ---- 原版 v1.2 md5: 審核核定常數（V4-03、R2-V4-03）----

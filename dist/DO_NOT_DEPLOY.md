@@ -69,6 +69,8 @@ sha256sum -c SHA256SUMS
 bash install.sh
 ```
 
-**已安裝的機器要升級**不要用部署包覆蓋，用兩個 patch：
-`patches/rpz_patch_sigpipe_v4.sh`（先）與 `patches/rpz_patch_phase1b_v1.sh`（後）。
-SOP 見 `patches/README.md`。
+**已安裝的機器要升級**不要用部署包覆蓋，用三個 patch，順序固定：
+`patches/patch1_sigpipe/rpz_patch_sigpipe_v4.sh` ->
+`patches/patch2_retention/rpz_patch_phase1b_v1.sh` ->
+`patches/patch3_syslog/rpz_patch_phase1c_v1.sh`。
+SOP 見 `patches/README.md`（總表）與各資料夾的 `README.md`。
