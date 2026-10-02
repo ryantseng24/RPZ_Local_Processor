@@ -2154,3 +2154,37 @@ patches/ 根目錄放總表。
 | 1B builder | 未重建。維持既有規則：須在 `f560b80` 的 checkout 重建 |
 | gitignore | 三個新 sidecar 路徑未被排除 |
 | 舊路徑殘留掃描 | 除歷史紀錄外無殘留 |
+
+---
+
+## 32. OP 健康檢查工具與 LAB 重建（2026-10-02）
+
+### 32.1 新增 tools/rpz_health_check.sh
+
+OP 要求一支獨立、唯讀的「第三方監控」腳本。
+8 項檢查：排程狀態、排程實際執行、最近 12 次結果、結果檔一致性與
+新鮮度、暫存檔上限、磁碟、RPZLocal 事件、DataGroup 載入。
+退出碼 0/1/2（正常/注意/異常），供日後接自動化監控。
+設計重點：單檔無相依；不寫任何檔案；新鮮度超時只給[注意]
+（來源可能整天無變更）；結果檔三檔 mtime 不一致判[異常]
+（「跑一半失敗」的特徵，見第 3.2 節）。
+
+### 32.2 驗證（全部實際執行）
+
+| 項目 | 結果 |
+|---|---|
+| bash -n | 通過 |
+| mock 健康情境 | 9 項全[正常]，RC=0 |
+| mock 故障情境（排程停、連續失敗、結果檔不一致、暫存檔 70、磁碟 84%、無事件、tmsh 失敗） | 7 項[異常]全數偵測，RC=2 |
+| LAB 實機（BIG-IP 17.1.3.1） | 9 項全[正常]，RC=0；第 2 項抓到 handler 自己的 tick |
+
+### 32.3 LAB 重建記錄
+
+使用者把 VM 空出來重建（/config 由 sda/3.2G 變 vda/2.1G）。
+snapshot 已含最終修正版七支腳本（md5 與 tracked source 全同）與 wrapper。
+使用者設定 DNS Express 兩個 zone 與 cache profile。
+本次補齊：DataGroup（`main.sh --force` 自動建立，rpztw revision 1
+size 2243094，dnsxdump 185,417 行，7 秒完成）、iCall
+（rpz_processor_script + rpz_processor_handler interval 300）、存檔。
+SSH 曾「金鑰被接受後立刻斷線」：admin shell 被設為 none，
+以 iControl REST PATCH 改回 bash（帳密走 curl 設定檔，用完即刪）。

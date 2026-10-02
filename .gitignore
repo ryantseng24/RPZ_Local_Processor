@@ -50,9 +50,11 @@ F5_rpztw_data_group.txt
 infoblox_rpz_data.csv
 # 客戶交付文件與診斷資料（不進 repo）
 客戶診斷資料_*/
+2026-09-15_abnormalRPZ/
 RPZ_修正報告_客戶版*.md
 RPZ_部署SOP_客戶版*.md
 RPZ_手動清檔作業說明*.md
+RPZ_UAT驗證清單*.md
 *.docx
 *.pdf
 *.JPG
